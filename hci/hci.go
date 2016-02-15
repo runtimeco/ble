@@ -1,4 +1,4 @@
-package bt
+package hci
 
 import (
 	"io"
@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/currantlabs/bt/cmd"
-	"github.com/currantlabs/bt/evt"
+	"github.com/currantlabs/bt/hci/cmd"
+	"github.com/currantlabs/bt/hci/evt"
 )
 
 // HCI ...

@@ -1,4 +1,4 @@
-package bt
+package hci
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/currantlabs/bt/evt"
+	"github.com/currantlabs/bt/hci/evt"
 )
 
 type dispatcher struct {

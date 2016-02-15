@@ -1,0 +1,40 @@
+## Attribute Protocol (ATT)
+
+This package implement Attribute Protocol (ATT) [Vol 3, Part F]
+
+#### Check list for ATT Server implementation.
+  - [x] Error Response [Vol 3, Part F, 3.4.1.1]
+  - [x] Exchange MTU Request [Vol 3, Part F, 3.4.2.1 & 3.4.2.2]
+  - [x] Find Information Request [Vol 3, Part F, 3.4.3.1 & 3.4.3.2]
+  - [x] Find By Type Value Request [Vol 3, Part F, 3.4.3.3 & 3.4.3.4]
+  - [x] Read By Type Request [Vol 3, Part F, 3.4.4.1 & 3.4.4.2]
+  - [x] Read Request [Vol 3, Part F, 3.4.4.3 & 3.4.4.4]
+  - [x] Read Blob Request [Vol 3, Part F, 3.4.4.5 & 3.4.4.6]
+  - [ ] Read Multiple Request [Vol 3, Part F, 3.4.4.7 & 3.4.4.8]
+  - [x] Read By Group Type Request [Vol 3, Part F, 3.4.4.9 & 3.4.4.10]
+  - [x] Write Request [Vol 3, Part F, 3.4.5.1 & 3.4.5.2]
+  - [x] Write Command [Vol 3, Part F, 3.4.5.3]
+  - [ ] Signed Write Command [Vol 3, Part F, 3.4.5.4]
+  - [ ] Prepare Write Request [Vol 3, Part F, 3.4.6.1 & 3.4.6.2]
+  - [ ] Execute Write Request [Vol 3, Part F, 3.4.6.3]
+  - [x] Handle Value Notification [Vol 3, Part F, 3.4.7.1]
+  - [x] Handle Value Indication [Vol 3, Part F, 3.4.7.2 & 3.4.7.3]
+
+#### Check list for ATT Client implementation.
+
+  - [x] Error Response [Vol 3, Part F, 3.4.1.1]
+  - [x] Exchange MTU Request [Vol 3, Part F, 3.4.2.1 & 3.4.2.2]
+  - [x] Find Information Request [Vol 3, Part F, 3.4.3.1 & 3.4.3.2]
+  - [ ] Find By Type Value Request [Vol 3, Part F, 3.4.3.3 & 3.4.3.4]
+  - [x] Read By Type Request [Vol 3, Part F, 3.4.4.1 & 3.4.4.2]
+  - [x] Read Request [Vol 3, Part F, 3.4.4.3 & 3.4.4.4]
+  - [x] Read Blob Request [Vol 3, Part F, 3.4.4.5 & 3.4.4.6]
+  - [ ] Read Multiple Request [Vol 3, Part F, 3.4.4.7 & 3.4.4.8]
+  - [x] Read By Group Type Request [Vol 3, Part F, 3.4.4.9 & 3.4.4.10]
+  - [x] Write Request [Vol 3, Part F, 3.4.5.1 & 3.4.5.2]
+  - [x] Write Command [Vol 3, Part F, 3.4.5.3]
+  - [ ] Signed Write Command [Vol 3, Part F, 3.4.5.4]
+  - [ ] Prepare Write Request [Vol 3, Part F, 3.4.6.1 & 3.4.6.2]
+  - [ ] Execute Write Request [Vol 3, Part F, 3.4.6.3]
+  - [x] Handle Value Notification [Vol 3, Part F, 3.4.7.1]
+  - [x] Handle Value Indication [Vol 3, Part F, 3.4.7.2 & 3.4.7.3]

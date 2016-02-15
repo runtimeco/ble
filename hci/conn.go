@@ -1,4 +1,4 @@
-package bt
+package hci
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/currantlabs/bt/evt"
+	"github.com/currantlabs/bt/hci/evt"
 )
 
 // Conn implements a L2CAP connection.

@@ -1,4 +1,4 @@
-package bt
+package hci
 
 import (
 	"bytes"

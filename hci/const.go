@@ -1,4 +1,4 @@
-package bt
+package hci
 
 // HCI Packet types
 const (

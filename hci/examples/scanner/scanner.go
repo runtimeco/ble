@@ -5,13 +5,13 @@ import (
 	"log"
 	"time"
 
-	"github.com/currantlabs/bt"
-	"github.com/currantlabs/bt/cmd"
-	"github.com/currantlabs/bt/evt"
+	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/hci/cmd"
+	"github.com/currantlabs/bt/hci/evt"
 )
 
 func main() {
-	h, err := bt.NewHCI(-1, false)
+	h, err := hci.NewHCI(-1, false)
 	if err != nil {
 		log.Printf("filed to new bt: %s", err)
 	}
@@ -26,7 +26,7 @@ func main() {
 	// Register our own advertising report handler.
 	h.SetSubeventHandler(
 		evt.LEAdvertisingReportEvent{}.SubCode(),
-		bt.HandlerFunc(handleLEAdvertisingReport))
+		hci.HandlerFunc(handleLEAdvertisingReport))
 
 	fmt.Printf("\nStart scanning for another second with customized advertising report handler ...\n")
 	time.Sleep(1 * time.Second)

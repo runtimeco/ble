@@ -1,6 +1,6 @@
 //go:generate sh -c "go run tools/codegen/codegen.go -tmpl signal -in tools/codegen/signal.json -out signal_gen.go && goimports -w signal_gen.go"
 
-package bt
+package hci
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/currantlabs/bt/cmd"
+	"github.com/currantlabs/bt/hci/cmd"
 )
 
 // Signal ...

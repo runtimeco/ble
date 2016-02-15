@@ -1,4 +1,4 @@
-package bt
+package hci
 
 import (
 	"errors"
@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/currantlabs/bt/gioctl"
-	"github.com/currantlabs/bt/socket"
+	"github.com/currantlabs/bt/hci/gioctl"
+	"github.com/currantlabs/bt/hci/socket"
 )
 
 const (
