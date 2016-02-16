@@ -80,7 +80,7 @@ func (c *Characteristic) Name() string {
 // Handle ...
 func (c *Characteristic) Handle(p Property, h Handler) {
 	c.Property |= p
-	// c.value[0] is dummy.
+
 	c.value[p&CharRead] = h
 	c.value[p&CharWriteNR] = h
 	c.value[p&CharWrite] = h
@@ -117,7 +117,7 @@ func (c *Characteristic) Handle(p Property, h Handler) {
 			req.Notifier = i
 			i.send = req.Central.server.SendIndication
 			i.done = false
-			h.Serve(resp, req)
+			go h.Serve(resp, req)
 		}
 		if (ccc&gattCCCIndicateFlag) != 0 && v&gattCCCIndicateFlag == 0 {
 			i.done = true
@@ -126,7 +126,7 @@ func (c *Characteristic) Handle(p Property, h Handler) {
 			req.Notifier = n
 			n.send = req.Central.server.SendNotification
 			n.done = false
-			h.Serve(resp, req)
+			go h.Serve(resp, req)
 		}
 		if (ccc&gattCCCNotifyFlag) != 0 && v&gattCCCNotifyFlag == 0 {
 			n.done = true
