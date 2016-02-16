@@ -32,6 +32,7 @@ type Client struct {
 	Conn hci.Conn
 	rspc chan []byte
 
+	rxBuf   []byte
 	chTxBuf chan []byte
 	chErr   chan error
 	handler NotificationHandler
@@ -43,6 +44,7 @@ func NewClient(l2c hci.Conn, h NotificationHandler) *Client {
 		Conn:    l2c,
 		rspc:    make(chan []byte),
 		chTxBuf: make(chan []byte, 1),
+		rxBuf:   make([]byte, 65535),
 		chErr:   make(chan error, 1),
 		handler: h,
 	}
@@ -56,9 +58,6 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 	if clientRxMTU < 23 || clientRxMTU > 65535 {
 		return 0, ErrInvalidArgument
 	}
-
-	// Let L2CAP know the MTU we can handle.
-	c.Conn.SetRxMTU(clientRxMTU)
 
 	// Acquire and reuse the txBuf, and release it after usage.
 	// The same txBuf, or a newly allocate one, if the txMTU is changed,
@@ -74,6 +73,9 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 	if err != nil {
 		return 0, err
 	}
+
+	// Let L2CAP know the MTU we can handle.
+	c.Conn.SetRxMTU(clientRxMTU)
 
 	// Convert and validate the response.
 	rsp := ExchangeMTUResponse(b)
@@ -96,6 +98,7 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 		// The txBuf has been captured in deferred function.
 		txBuf = make([]byte, txMTU, txMTU)
 	}
+
 	return 0, nil
 }
 
@@ -505,10 +508,9 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 
 // Loop ...
 func (c *Client) Loop() {
-	buf := make([]byte, 512) // TODO: MTU
 	confirmation := []byte{HandleValueConfirmationCode}
 	for {
-		n, err := c.Conn.Read(buf)
+		n, err := c.Conn.Read(c.rxBuf)
 		if err != nil {
 			// We don't expect any error from the bearer (L2CAP ACL-U)
 			// Pass it along to the pending request, if any, and escape.
@@ -517,7 +519,7 @@ func (c *Client) Loop() {
 		}
 
 		b := make([]byte, n)
-		copy(b, buf)
+		copy(b, c.rxBuf)
 
 		if (b[0] != HandleValueNotificationCode) && (b[0] != HandleValueIndicationCode) {
 			c.rspc <- b
