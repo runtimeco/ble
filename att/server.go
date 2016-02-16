@@ -205,7 +205,7 @@ func (s *Server) handleFindInformationRequest(r FindInformationRequest) []byte {
 	buf.Reset()
 
 	// Each response shall contain Types of the same format.
-	for _, a := range s.attrs.Subrange(r.StartingHandle(), r.EndingHandle()) {
+	for _, a := range s.attrs.subrange(r.StartingHandle(), r.EndingHandle()) {
 		if rsp.Format() == 0 {
 			rsp.SetFormat(0x01)
 			if a.Type.Len() == 16 {
@@ -247,7 +247,7 @@ func (s *Server) handleFindByTypeValueRequest(r FindByTypeValueRequest) []byte {
 	buf := bytes.NewBuffer(rsp.HandleInformationList())
 	buf.Reset()
 
-	for _, a := range s.attrs.Subrange(r.StartingHandle(), r.EndingHandle()) {
+	for _, a := range s.attrs.subrange(r.StartingHandle(), r.EndingHandle()) {
 		v, starth, endh := a.Value, a.Handle, a.EndingHandle
 		if v == nil {
 			// The value shall not exceed ATT_MTU - 7 bytes.
@@ -294,7 +294,7 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 	// handle length (2 bytes) + value length.
 	// Each response shall only contains values with the same size.
 	dlen := 0
-	for _, a := range s.attrs.Subrange(r.StartingHandle(), r.EndingHandle()) {
+	for _, a := range s.attrs.subrange(r.StartingHandle(), r.EndingHandle()) {
 		if !a.Type.Equal(UUID(r.AttributeType())) {
 			continue
 		}
@@ -346,7 +346,7 @@ func (s *Server) handleReadRequest(r ReadRequest) []byte {
 	buf := bytes.NewBuffer(rsp.AttributeValue())
 	buf.Reset()
 
-	a, ok := s.attrs.At(r.AttributeHandle())
+	a, ok := s.attrs.at(r.AttributeHandle())
 	if !ok {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ErrInvalidHandle)
 	}
@@ -373,7 +373,7 @@ func (s *Server) handleReadBlobRequest(r ReadBlobRequest) []byte {
 		return NewErrorResponse(r.AttributeOpcode(), 0x0000, ErrInvalidPDU)
 	}
 
-	a, ok := s.attrs.At(r.AttributeHandle())
+	a, ok := s.attrs.at(r.AttributeHandle())
 	if !ok {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ErrInvalidHandle)
 	}
@@ -413,7 +413,7 @@ func (s *Server) handleReadByGroupRequest(r ReadByGroupTypeRequest) []byte {
 	buf.Reset()
 
 	dlen := 0
-	for _, a := range s.attrs.Subrange(r.StartingHandle(), r.EndingHandle()) {
+	for _, a := range s.attrs.subrange(r.StartingHandle(), r.EndingHandle()) {
 		v := a.Value
 		if v == nil {
 			buf2 := bytes.NewBuffer(make([]byte, buf.Cap()-buf.Len()-4))
@@ -452,7 +452,7 @@ func (s *Server) handleWriteRequest(r WriteRequest) []byte {
 		return NewErrorResponse(r.AttributeOpcode(), 0x0000, ErrInvalidPDU)
 	}
 
-	a, ok := s.attrs.At(r.AttributeHandle())
+	a, ok := s.attrs.at(r.AttributeHandle())
 	if !ok {
 		return NewErrorResponse(r.AttributeOpcode(), r.AttributeHandle(), ErrInvalidHandle)
 	}
@@ -475,7 +475,7 @@ func (s *Server) handleWriteCommand(r WriteCommand) []byte {
 		return nil
 	}
 
-	a, ok := s.attrs.At(r.AttributeHandle())
+	a, ok := s.attrs.at(r.AttributeHandle())
 	if !ok {
 		return nil
 	}

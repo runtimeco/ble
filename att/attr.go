@@ -48,7 +48,7 @@ func (r *Range) idx(h int) int {
 }
 
 // At returns Attribute a.
-func (r *Range) At(h uint16) (a Attribute, ok bool) {
+func (r *Range) at(h uint16) (a Attribute, ok bool) {
 	i := r.idx(int(h))
 	if i < 0 {
 		return Attribute{}, false
@@ -58,7 +58,7 @@ func (r *Range) At(h uint16) (a Attribute, ok bool) {
 
 // Subrange returns attributes in range [start, end]; it may return an empty
 // slice. Subrange does not panic for out-of-range start or end.
-func (r *Range) Subrange(start, end uint16) []Attribute {
+func (r *Range) subrange(start, end uint16) []Attribute {
 	startidx := r.idx(int(start))
 	switch startidx {
 	case tooSmall:
