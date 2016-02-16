@@ -26,8 +26,7 @@ func NewCountService() *gatt.Service {
 		}))
 
 	s.AddCharacteristic(gatt.MustParseUUID("1c927b50-c116-11e3-8a33-0800200c9a66")).Handle(
-		gatt.CharNotify,
-		// gatt.CharIndicate|gatt.CharNotify,
+		gatt.CharIndicate|gatt.CharNotify,
 		gatt.HandlerFunc(func(rsp *gatt.ResponseWriter, req *gatt.Request) {
 			go func() {
 				n := req.Notifier

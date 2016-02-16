@@ -2,7 +2,6 @@ package gatt
 
 import (
 	"encoding/binary"
-	"errors"
 	"net"
 	"sync"
 
@@ -204,103 +203,79 @@ type NotificationHandler func(req []byte)
 
 // SetNotificationHandler sets notifications for the value of a specified characteristic.
 func (p *Peripheral) SetNotificationHandler(c *Characteristic, h NotificationHandler) error {
-	if c.cccd == nil {
-		return errors.New("no cccd") // FIXME
-	}
-	return p.setHandler(c.cccd.h, c.vh, gattCCCNotifyFlag, h)
+	return p.setHandlers(c.cccd.h, c.vh, gattCCCNotifyFlag, h)
 }
 
 // SetIndicationHandler sets indications for the value of a specified characteristic.
 func (p *Peripheral) SetIndicationHandler(c *Characteristic, h NotificationHandler) error {
-	if c.cccd == nil {
-		return errors.New("no cccd") // FIXME
-	}
-	return p.setHandler(c.cccd.h, c.vh, gattCCCIndicateFlag, h)
+	return p.setHandlers(c.cccd.h, c.vh, gattCCCIndicateFlag, h)
 }
 
-func (p *Peripheral) setHandler(cccdh, valueh, flag uint16, h NotificationHandler) error {
-	ccc := make([]byte, 2)
-	binary.LittleEndian.PutUint16(ccc, flag)
-	p.handler.setHandler(cccdh, valueh, flag, h)
-	if err := p.c.Write(cccdh, ccc); err != nil {
-		return err
+func (p *Peripheral) setHandlers(cccdh, vh, flag uint16, h NotificationHandler) error {
+	s, ok := p.handler.stubs[vh]
+	if !ok {
+		s = &stub{cccdh, 0x0000, nil, nil}
+		p.handler.stubs[vh] = s
 	}
-	return nil
+	switch {
+	case h == nil && (s.ccc&flag) == 0:
+		return nil
+	case h != nil && (s.ccc&flag) != 0:
+		return nil
+	case h == nil && (s.ccc&flag) != 0:
+		s.ccc &= ^uint16(flag)
+	case h != nil && (s.ccc&flag) == 0:
+		s.ccc |= flag
+	}
+
+	v := make([]byte, 2)
+	binary.LittleEndian.PutUint16(v, s.ccc)
+	if flag == gattCCCNotifyFlag {
+		s.nHandler = h
+	} else {
+		s.iHandler = h
+	}
+	return p.c.Write(s.cccdh, v)
 }
 
-func (p *Peripheral) clearHandler(c *Characteristic, flag uint16) error {
-	ccc := make([]byte, 2)
-	if err := p.c.Write(c.cccd.h, ccc); err != nil {
-		return err
-	}
-	p.handler.setHandler(c.cccd.h, c.vh, flag, nil)
-	return nil
-}
-
+// ClearHandlers ...
 func (p *Peripheral) ClearHandlers() error {
-	cccdh := make(map[uint16]uint16)
-	for k, v := range p.handler.icccdhs {
-		cccdh[k] = v
-	}
-	for k, v := range p.handler.ncccdhs {
-		cccdh[k] = v
-	}
-	for _, cccdh := range cccdh {
-		ccc := make([]byte, 2)
-		if err := p.c.Write(cccdh, ccc); err != nil {
-			return err
-		}
+	for _, s := range p.handler.stubs {
+		v := make([]byte, 2)
+		binary.LittleEndian.PutUint16(v, 0)
+		return p.c.Write(s.cccdh, v)
 	}
 	return nil
 }
 
 type nHandlers struct {
 	*sync.RWMutex
-	iHandlers map[uint16]NotificationHandler
-	nHandlers map[uint16]NotificationHandler
-	icccdhs   map[uint16]uint16
-	ncccdhs   map[uint16]uint16
+	stubs map[uint16]*stub
+}
+
+type stub struct {
+	cccdh    uint16
+	ccc      uint16
+	nHandler NotificationHandler
+	iHandler NotificationHandler
 }
 
 func newNHandler() *nHandlers {
 	h := &nHandlers{
-		RWMutex:   &sync.RWMutex{},
-		iHandlers: make(map[uint16]NotificationHandler),
-		nHandlers: make(map[uint16]NotificationHandler),
-		icccdhs:   make(map[uint16]uint16),
-		ncccdhs:   make(map[uint16]uint16),
+		RWMutex: &sync.RWMutex{},
+		stubs:   make(map[uint16]*stub),
 	}
 	return h
 }
 
 func (n *nHandlers) HandleNotification(req []byte) {
 	n.RLock()
-	defer n.RUnlock()
-	handlers := n.nHandlers
-	if req[0] == att.HandleValueIndicationCode {
-		handlers = n.iHandlers
-	}
 	valueh := att.HandleValueIndication(req).AttributeHandle()
-	h := handlers[valueh]
-	if h != nil {
-		h(req[3:])
+	stub := n.stubs[valueh]
+	h := stub.nHandler
+	if req[0] == att.HandleValueIndicationCode {
+		h = stub.iHandler
 	}
-}
-
-func (n *nHandlers) setHandler(cccdh, valueh, flag uint16, h NotificationHandler) {
-	n.Lock()
-	defer n.Unlock()
-	handlers := n.nHandlers
-	cccdhs := n.ncccdhs
-	if flag == gattCCCIndicateFlag {
-		handlers = n.iHandlers
-		cccdhs = n.icccdhs
-	}
-	if h == nil {
-		delete(handlers, valueh)
-		delete(cccdhs, valueh)
-		return
-	}
-	handlers[valueh] = h
-	cccdhs[valueh] = cccdh
+	n.RUnlock()
+	h(req[3:])
 }

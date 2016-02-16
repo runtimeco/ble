@@ -79,6 +79,7 @@ func (c *Characteristic) Name() string {
 
 // Handle ...
 func (c *Characteristic) Handle(p Property, h Handler) {
+	c.Property |= p
 	// c.value[0] is dummy.
 	c.value[p&CharRead] = h
 	c.value[p&CharWriteNR] = h
@@ -86,47 +87,52 @@ func (c *Characteristic) Handle(p Property, h Handler) {
 	c.value[p&CharSignedWrite] = h
 	c.value[p&CharExtended] = h
 
-	if p&(CharNotify|CharIndicate) != 0 {
-		d := c.AddDescriptor(attrClientCharacteristicConfigUUID)
-		var ccc uint16
-		n := &Notifier{
-			char: c,
-		}
-		d.value[CharRead] = HandlerFunc(func(resp *ResponseWriter, req *Request) {
-			log.Printf("CCCD: read: 0x%04X", ccc)
-			binary.Write(resp, binary.LittleEndian, ccc)
-		})
-		d.value[CharWrite] = HandlerFunc(func(resp *ResponseWriter, req *Request) {
-			if len(req.Data) != 2 {
-				resp.SetStatus(att.ErrInvalAttrValueLen)
-				return
-			}
-			v := binary.LittleEndian.Uint16(req.Data)
-			log.Printf("CCC: 0x%04X -> 0x%04X", ccc, v)
-			if (ccc&gattCCCIndicateFlag) == 0 && v&gattCCCIndicateFlag != 0 {
-				log.Printf("CCCD: subscribe indicatation")
-				req.Notifier = n
-				n.send = req.Central.server.SendIndication
-				n.done = false
-				h.Serve(resp, req)
-			} else if (ccc&gattCCCIndicateFlag) != 0 && v&gattCCCIndicateFlag == 0 {
-				log.Printf("CCCD: unsubscribe indication")
-				n.done = true
-			}
-			if (ccc&gattCCCNotifyFlag) == 0 && v&gattCCCNotifyFlag != 0 {
-				log.Printf("CCCD: subscribe notification")
-				req.Notifier = n
-				n.send = req.Central.server.SendNotification
-				n.done = false
-				h.Serve(resp, req)
-			} else if (ccc&gattCCCNotifyFlag) != 0 && v&gattCCCNotifyFlag == 0 {
-				log.Printf("CCCD: unsubscribe notification")
-				n.done = true
-			}
-			ccc = v
-		})
+	if p&(CharNotify|CharIndicate) == 0 {
+		return
 	}
-	c.Property |= p
+
+	d := c.cccd
+	if d == nil {
+		d = c.AddDescriptor(attrClientCharacteristicConfigUUID)
+		c.cccd = d
+	}
+
+	var ccc uint16
+	n := &Notifier{char: c}
+	i := &Notifier{char: c}
+
+	d.value[CharRead] = HandlerFunc(func(resp *ResponseWriter, req *Request) {
+		log.Printf("CCCD: read: 0x%04X", ccc)
+		binary.Write(resp, binary.LittleEndian, ccc)
+	})
+
+	d.value[CharWrite] = HandlerFunc(func(resp *ResponseWriter, req *Request) {
+		if len(req.Data) != 2 {
+			resp.SetStatus(att.ErrInvalAttrValueLen)
+			return
+		}
+		v := binary.LittleEndian.Uint16(req.Data)
+		log.Printf("CCC: 0x%04X -> 0x%04X", ccc, v)
+		if (ccc&gattCCCIndicateFlag) == 0 && v&gattCCCIndicateFlag != 0 {
+			req.Notifier = i
+			i.send = req.Central.server.SendIndication
+			i.done = false
+			h.Serve(resp, req)
+		}
+		if (ccc&gattCCCIndicateFlag) != 0 && v&gattCCCIndicateFlag == 0 {
+			i.done = true
+		}
+		if (ccc&gattCCCNotifyFlag) == 0 && v&gattCCCNotifyFlag != 0 {
+			req.Notifier = n
+			n.send = req.Central.server.SendNotification
+			n.done = false
+			h.Serve(resp, req)
+		}
+		if (ccc&gattCCCNotifyFlag) != 0 && v&gattCCCNotifyFlag == 0 {
+			n.done = true
+		}
+		ccc = v
+	})
 }
 
 // SetValue ...
