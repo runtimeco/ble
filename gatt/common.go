@@ -115,8 +115,8 @@ func setupCCCD(c *Characteristic, h Handler) *Descriptor {
 	}
 
 	var ccc uint16
-	n := &notifier{char: c}
-	i := &notifier{char: c}
+	n := &notifier{indicate: false}
+	i := &notifier{indicate: true}
 
 	d.Handle(
 		CharRead,
@@ -128,7 +128,6 @@ func setupCCCD(c *Characteristic, h Handler) *Descriptor {
 		CharWrite|CharWriteNR,
 		HandlerFunc(func(ctx context.Context, resp *ResponseWriter) {
 			data := Data(ctx)
-			central := central(ctx)
 			if len(data) != 2 {
 				resp.SetStatus(att.ErrInvalAttrValueLen)
 				return
@@ -136,21 +135,29 @@ func setupCCCD(c *Characteristic, h Handler) *Descriptor {
 			new := binary.LittleEndian.Uint16(data)
 			log.Printf("CCC: 0x%04X -> 0x%04X", ccc, new)
 
-			i.send = central.server.Indicate
-			n.send = central.server.Notify
-
-			i.done = new&flagCCCIndicate == 0
-			n.done = new&flagCCCNotify == 0
-
-			if !i.done && ccc&flagCCCIndicate == 0 {
-				go h.Serve(WithNotifier(ctx, i), resp)
-			}
-			if !n.done && ccc&flagCCCNotify == 0 {
-				go h.Serve(WithNotifier(ctx, n), resp)
-			}
+			n.config(c, new&flagCCCNotify != 0, ctx, h, resp)
+			i.config(c, new&flagCCCIndicate != 0, ctx, h, resp)
 			ccc = new
 		}))
 	return d
+}
+
+func (n *notifier) config(c *Characteristic, en bool, ctx context.Context, h Handler, resp *ResponseWriter) {
+	if en == n.enabled {
+		return
+	}
+	if n.enabled = en; !en {
+		n.cancel()
+		return
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	central := central(ctx)
+	n.send = func(b []byte) (int, error) { return central.server.Notify(c.vh, b) }
+	if n.indicate {
+		n.send = func(b []byte) (int, error) { return central.server.Indicate(c.vh, b) }
+	}
+	n.cancel = cancel
+	go h.Serve(WithNotifier(ctx, n), resp)
 }
 
 // Handle ...
@@ -264,23 +271,23 @@ func (v attValue) setvalue(value []byte) {
 
 // A Notifier provides a means for a GATT server to send notifications about value changes to a connected device.
 type notifier struct {
-	char   *Characteristic
-	maxlen int
-	done   bool
-	send   func(uint16, []byte) (int, error)
+	indicate bool
+	maxlen   int
+	enabled  bool
+	cancel   func()
+	send     func([]byte) (int, error)
 }
 
 // Write sends data to the central.
 func (n *notifier) Write(b []byte) (int, error) {
-	return n.send(n.char.vh, b)
+	return n.send(b)
 }
 
 // Cap returns the maximum number of bytes that may be sent in a single notification.
 func (n *notifier) Cap() int { return n.maxlen }
 
 // Done reports whether the central has requested not to receive any more notifications with this notifier.
-func (n *notifier) Done() bool { return n.done }
-func (n *notifier) stop()      { n.done = true }
+func (n *notifier) Done() bool { return n.enabled }
 
 // ResponseWriter ...
 type ResponseWriter struct {

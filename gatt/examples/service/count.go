@@ -33,10 +33,14 @@ func NewCountService() *gatt.Service {
 		gatt.HandlerFunc(func(ctx context.Context, rsp *gatt.ResponseWriter) {
 			n := gatt.Notifier(ctx)
 			cnt := 0
-			for !n.Done() {
-				fmt.Fprintf(n, "Count: %d", cnt)
-				cnt++
-				time.Sleep(time.Second)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second):
+					fmt.Fprintf(n, "Count: %d", cnt)
+					cnt++
+				}
 			}
 		}))
 
