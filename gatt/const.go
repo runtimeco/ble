@@ -1,12 +1,5 @@
 package gatt
 
-// This file includes constants from the BLE spec.
-
-const (
-	attMTUDefault = 23
-	attMTUMax     = 512
-)
-
 var (
 	attrGAPUUID  = UUID16(0x1800)
 	attrGATTUUID = UUID16(0x1801)

@@ -2,7 +2,6 @@ package gatt
 
 import (
 	"encoding/binary"
-	"log"
 
 	"golang.org/x/net/context"
 
@@ -132,37 +131,17 @@ func setupCCCD(c *Characteristic, h Handler) *Descriptor {
 				resp.SetStatus(att.ErrInvalAttrValueLen)
 				return
 			}
-			new := binary.LittleEndian.Uint16(data)
-			log.Printf("CCC: 0x%04X -> 0x%04X", ccc, new)
-
-			n.config(c, new&flagCCCNotify != 0, ctx, h, resp)
-			i.config(c, new&flagCCCIndicate != 0, ctx, h, resp)
-			ccc = new
+			ccc := binary.LittleEndian.Uint16(data)
+			// Ignore bits that are not defined in spec.
+			ccc &= flagCCCNotify | flagCCCIndicate
+			n.config(c, ccc&flagCCCNotify != 0, ctx, h, resp)
+			i.config(c, ccc&flagCCCIndicate != 0, ctx, h, resp)
 		}))
 	return d
 }
 
-func (n *notifier) config(c *Characteristic, en bool, ctx context.Context, h Handler, resp *ResponseWriter) {
-	if en == n.enabled {
-		return
-	}
-	if n.enabled = en; !en {
-		n.cancel()
-		return
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	central := central(ctx)
-	n.send = func(b []byte) (int, error) { return central.server.Notify(c.vh, b) }
-	if n.indicate {
-		n.send = func(b []byte) (int, error) { return central.server.Indicate(c.vh, b) }
-	}
-	n.cancel = cancel
-	go h.Serve(WithNotifier(ctx, n), resp)
-}
-
 // Handle ...
 func (c *Characteristic) Handle(p Property, h Handler) *Characteristic {
-
 	c.value[p&CharRead] = h
 	c.value[p&CharWriteNR] = h
 	c.value[p&CharWrite] = h
@@ -251,12 +230,13 @@ func (v attValue) Handle(ctx context.Context, req []byte, resp *att.ResponseWrit
 			return att.ErrWriteNotPerm
 		}
 		ctx = WithData(ctx, att.WriteRequest(req).AttributeValue())
-	case att.PrepareWriteRequestCode:
-	case att.ExecuteWriteRequestCode:
-	case att.SignedWriteCommandCode:
+	// case att.PrepareWriteRequestCode:
+	// case att.ExecuteWriteRequestCode:
+	// case att.SignedWriteCommandCode:
 	// case att.ReadByGroupTypeRequestCode:
 	// case att.ReadMultipleRequestCode:
 	default:
+		return att.ErrReqNotSupp
 	}
 
 	h.Serve(ctx, gattResp)
@@ -286,8 +266,23 @@ func (n *notifier) Write(b []byte) (int, error) {
 // Cap returns the maximum number of bytes that may be sent in a single notification.
 func (n *notifier) Cap() int { return n.maxlen }
 
-// Done reports whether the central has requested not to receive any more notifications with this notifier.
-func (n *notifier) Done() bool { return n.enabled }
+func (n *notifier) config(c *Characteristic, en bool, ctx context.Context, h Handler, resp *ResponseWriter) {
+	if en == n.enabled {
+		return
+	}
+	if n.enabled = en; !en {
+		n.cancel()
+		return
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	central := central(ctx)
+	n.send = func(b []byte) (int, error) { return central.server.Notify(c.vh, b) }
+	if n.indicate {
+		n.send = func(b []byte) (int, error) { return central.server.Indicate(c.vh, b) }
+	}
+	n.cancel = cancel
+	go h.Serve(WithNotifier(ctx, n), resp)
+}
 
 // ResponseWriter ...
 type ResponseWriter struct {
