@@ -47,8 +47,8 @@ func NewServer(ctx context.Context, a *Range, l2c hci.Conn, rxMTU int) *Server {
 	return s
 }
 
-// SendNotification sends notification to remote central.
-func (s *Server) SendNotification(h uint16, data []byte) (int, error) {
+// Notify sends notification to remote central.
+func (s *Server) Notify(h uint16, data []byte) (int, error) {
 	log.Printf("Notifying 0x%04X, %s", h, string(data))
 
 	// Acquire and reuse notifyBuffer. Release it after usage.
@@ -67,8 +67,8 @@ func (s *Server) SendNotification(h uint16, data []byte) (int, error) {
 	return s.l2c.Write(rsp[:3+buf.Len()])
 }
 
-// SendIndication sends indication to remote central.
-func (s *Server) SendIndication(h uint16, data []byte) (int, error) {
+// Indicate sends indication to remote central.
+func (s *Server) Indicate(h uint16, data []byte) (int, error) {
 	log.Printf("Indicating 0x%04X, %s", h, string(data))
 
 	// Acquire and reuse indicateBuffer. Release it after usage.

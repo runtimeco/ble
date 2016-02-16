@@ -118,38 +118,38 @@ func setupCCCD(c *Characteristic, h Handler) *Descriptor {
 	n := &notifier{char: c}
 	i := &notifier{char: c}
 
-	d.value[CharRead] = HandlerFunc(func(ctx context.Context, resp *ResponseWriter) {
-		log.Printf("CCCD: read: 0x%04X", ccc)
-		binary.Write(resp, binary.LittleEndian, ccc)
-	})
+	d.Handle(
+		CharRead,
+		HandlerFunc(func(ctx context.Context, resp *ResponseWriter) {
+			binary.Write(resp, binary.LittleEndian, ccc)
+		}))
 
-	d.value[CharWrite] = HandlerFunc(func(ctx context.Context, resp *ResponseWriter) {
-		data := Data(ctx)
-		central := central(ctx)
-		if len(data) != 2 {
-			resp.SetStatus(att.ErrInvalAttrValueLen)
-			return
-		}
-		v := binary.LittleEndian.Uint16(data)
-		log.Printf("CCC: 0x%04X -> 0x%04X", ccc, v)
-		if (ccc&gattCCCIndicateFlag) == 0 && v&gattCCCIndicateFlag != 0 {
-			i.send = central.server.SendIndication
-			i.done = false
-			go h.Serve(WithNotifier(ctx, i), resp)
-		}
-		if (ccc&gattCCCIndicateFlag) != 0 && v&gattCCCIndicateFlag == 0 {
-			i.done = true
-		}
-		if (ccc&gattCCCNotifyFlag) == 0 && v&gattCCCNotifyFlag != 0 {
-			n.send = central.server.SendNotification
-			n.done = false
-			go h.Serve(WithNotifier(ctx, n), resp)
-		}
-		if (ccc&gattCCCNotifyFlag) != 0 && v&gattCCCNotifyFlag == 0 {
-			n.done = true
-		}
-		ccc = v
-	})
+	d.Handle(
+		CharWrite|CharWriteNR,
+		HandlerFunc(func(ctx context.Context, resp *ResponseWriter) {
+			data := Data(ctx)
+			central := central(ctx)
+			if len(data) != 2 {
+				resp.SetStatus(att.ErrInvalAttrValueLen)
+				return
+			}
+			new := binary.LittleEndian.Uint16(data)
+			log.Printf("CCC: 0x%04X -> 0x%04X", ccc, new)
+
+			i.send = central.server.Indicate
+			n.send = central.server.Notify
+
+			i.done = new&flagCCCIndicate == 0
+			n.done = new&flagCCCNotify == 0
+
+			if !i.done && ccc&flagCCCIndicate == 0 {
+				go h.Serve(WithNotifier(ctx, i), resp)
+			}
+			if !n.done && ccc&flagCCCNotify == 0 {
+				go h.Serve(WithNotifier(ctx, n), resp)
+			}
+			ccc = new
+		}))
 	return d
 }
 
@@ -221,22 +221,26 @@ func (v attValue) Handle(ctx context.Context, req []byte, resp *att.ResponseWrit
 	gattResp := &ResponseWriter{resp: resp, status: att.ErrSuccess}
 	var h Handler
 	switch req[0] {
+	case att.ReadByTypeRequestCode:
+		if h = v[CharRead]; h == nil {
+			return att.ErrReadNotPerm
+		}
 	case att.ReadRequestCode:
 		if h = v[CharRead]; h == nil {
 			return att.ErrReadNotPerm
 		}
 	case att.ReadBlobRequestCode:
-		if h = v[CharRead]; h != nil {
+		if h = v[CharRead]; h == nil {
 			return att.ErrReadNotPerm
 		}
 		ctx = WithOffset(ctx, int(att.ReadBlobRequest(req).ValueOffset()))
 	case att.WriteRequestCode:
-		if h = v[CharWrite]; h != nil {
+		if h = v[CharWrite]; h == nil {
 			return att.ErrWriteNotPerm
 		}
 		ctx = WithData(ctx, att.WriteRequest(req).AttributeValue())
 	case att.WriteCommandCode:
-		if h = v[CharWriteNR]; h != nil {
+		if h = v[CharWriteNR]; h == nil {
 			return att.ErrWriteNotPerm
 		}
 		ctx = WithData(ctx, att.WriteRequest(req).AttributeValue())
@@ -244,7 +248,6 @@ func (v attValue) Handle(ctx context.Context, req []byte, resp *att.ResponseWrit
 	case att.ExecuteWriteRequestCode:
 	case att.SignedWriteCommandCode:
 	// case att.ReadByGroupTypeRequestCode:
-	// case att.ReadByTypeRequestCode:
 	// case att.ReadMultipleRequestCode:
 	default:
 	}

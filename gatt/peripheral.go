@@ -203,12 +203,12 @@ type NotificationHandler func(req []byte)
 
 // SetNotificationHandler sets notifications for the value of a specified characteristic.
 func (p *Peripheral) SetNotificationHandler(c *Characteristic, h NotificationHandler) error {
-	return p.setHandlers(c.cccd.h, c.vh, gattCCCNotifyFlag, h)
+	return p.setHandlers(c.cccd.h, c.vh, flagCCCNotify, h)
 }
 
 // SetIndicationHandler sets indications for the value of a specified characteristic.
 func (p *Peripheral) SetIndicationHandler(c *Characteristic, h NotificationHandler) error {
-	return p.setHandlers(c.cccd.h, c.vh, gattCCCIndicateFlag, h)
+	return p.setHandlers(c.cccd.h, c.vh, flagCCCIndicate, h)
 }
 
 func (p *Peripheral) setHandlers(cccdh, vh, flag uint16, h NotificationHandler) error {
@@ -230,7 +230,7 @@ func (p *Peripheral) setHandlers(cccdh, vh, flag uint16, h NotificationHandler) 
 
 	v := make([]byte, 2)
 	binary.LittleEndian.PutUint16(v, s.ccc)
-	if flag == gattCCCNotifyFlag {
+	if flag == flagCCCNotify {
 		s.nHandler = h
 	} else {
 		s.iHandler = h

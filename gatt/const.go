@@ -28,6 +28,6 @@ var (
 )
 
 const (
-	gattCCCNotifyFlag   = 0x0001
-	gattCCCIndicateFlag = 0x0002
+	flagCCCNotify   = 0x0001
+	flagCCCIndicate = 0x0002
 )
