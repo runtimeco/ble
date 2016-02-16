@@ -9,17 +9,15 @@ import (
 
 // Central is the interface that represent a remote central device.
 type Central struct {
-	l2c       hci.Conn
-	server    *att.Server
-	notifiers map[uint16]*Notifier
+	l2c    hci.Conn
+	server *att.Server
 }
 
 func newCentral(a *att.Range, l2c hci.Conn) *Central {
 	c := &Central{
-		l2c:       l2c,
-		notifiers: make(map[uint16]*Notifier),
+		l2c: l2c,
 	}
-	ctx := context.WithValue(context.Background(), "central", c)
+	ctx := context.WithValue(context.Background(), keyCentral, c)
 	c.server = att.NewServer(ctx, a, l2c, 1024)
 	return c
 }
@@ -31,9 +29,6 @@ func (c *Central) ID() string {
 
 // Close disconnects the connection.
 func (c *Central) Close() error {
-	for _, n := range c.notifiers {
-		n.stop()
-	}
 	return c.l2c.Close()
 }
 

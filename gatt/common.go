@@ -9,13 +9,43 @@ import (
 	"github.com/currantlabs/bt/att"
 )
 
-// A Request is the context for a request from a connected central device.
-type Request struct {
-	Central  *Central
-	Cap      int // maximum allowed reply length
-	Offset   int // request value offset
-	Data     []byte
-	Notifier *Notifier
+const (
+	keyData = iota
+	keyOffset
+	keyCentral
+	keyNotifier
+)
+
+// Data ...
+func Data(ctx context.Context) []byte { return ctx.Value(keyData).([]byte) }
+
+// WithData ...
+func WithData(ctx context.Context, d []byte) context.Context {
+	return context.WithValue(ctx, keyData, d)
+}
+
+// Offset ...
+func Offset(ctx context.Context) int { return ctx.Value(keyOffset).(int) }
+
+// WithOffset ...
+func WithOffset(ctx context.Context, o int) context.Context {
+	return context.WithValue(ctx, keyOffset, o)
+}
+
+// central ...
+func central(ctx context.Context) *Central { return ctx.Value(keyCentral).(*Central) }
+
+// withCentral ...
+func withCentral(ctx context.Context, c *Central) context.Context {
+	return context.WithValue(ctx, keyCentral, c)
+}
+
+// Notifier ...
+func Notifier(ctx context.Context) *notifier { return ctx.Value(keyNotifier).(*notifier) }
+
+// WithNotifier ...
+func WithNotifier(ctx context.Context, n *notifier) context.Context {
+	return context.WithValue(ctx, keyNotifier, n)
 }
 
 // Property ...
@@ -77,20 +107,7 @@ func (c *Characteristic) Name() string {
 	return knownCharacteristics[c.UUID.String()].Name
 }
 
-// Handle ...
-func (c *Characteristic) Handle(p Property, h Handler) *Characteristic {
-	c.Property |= p
-
-	c.value[p&CharRead] = h
-	c.value[p&CharWriteNR] = h
-	c.value[p&CharWrite] = h
-	c.value[p&CharSignedWrite] = h
-	c.value[p&CharExtended] = h
-
-	if p&(CharNotify|CharIndicate) == 0 {
-		return c
-	}
-
+func setupCCCD(c *Characteristic, h Handler) *Descriptor {
 	d := c.cccd
 	if d == nil {
 		d = c.AddDescriptor(attrClientCharacteristicConfigUUID)
@@ -98,41 +115,58 @@ func (c *Characteristic) Handle(p Property, h Handler) *Characteristic {
 	}
 
 	var ccc uint16
-	n := &Notifier{char: c}
-	i := &Notifier{char: c}
+	n := &notifier{char: c}
+	i := &notifier{char: c}
 
-	d.value[CharRead] = HandlerFunc(func(resp *ResponseWriter, req *Request) {
+	d.value[CharRead] = HandlerFunc(func(ctx context.Context, resp *ResponseWriter) {
 		log.Printf("CCCD: read: 0x%04X", ccc)
 		binary.Write(resp, binary.LittleEndian, ccc)
 	})
 
-	d.value[CharWrite] = HandlerFunc(func(resp *ResponseWriter, req *Request) {
-		if len(req.Data) != 2 {
+	d.value[CharWrite] = HandlerFunc(func(ctx context.Context, resp *ResponseWriter) {
+		data := Data(ctx)
+		central := central(ctx)
+		if len(data) != 2 {
 			resp.SetStatus(att.ErrInvalAttrValueLen)
 			return
 		}
-		v := binary.LittleEndian.Uint16(req.Data)
+		v := binary.LittleEndian.Uint16(data)
 		log.Printf("CCC: 0x%04X -> 0x%04X", ccc, v)
 		if (ccc&gattCCCIndicateFlag) == 0 && v&gattCCCIndicateFlag != 0 {
-			req.Notifier = i
-			i.send = req.Central.server.SendIndication
+			i.send = central.server.SendIndication
 			i.done = false
-			go h.Serve(resp, req)
+			go h.Serve(WithNotifier(ctx, i), resp)
 		}
 		if (ccc&gattCCCIndicateFlag) != 0 && v&gattCCCIndicateFlag == 0 {
 			i.done = true
 		}
 		if (ccc&gattCCCNotifyFlag) == 0 && v&gattCCCNotifyFlag != 0 {
-			req.Notifier = n
-			n.send = req.Central.server.SendNotification
+			n.send = central.server.SendNotification
 			n.done = false
-			go h.Serve(resp, req)
+			go h.Serve(WithNotifier(ctx, n), resp)
 		}
 		if (ccc&gattCCCNotifyFlag) != 0 && v&gattCCCNotifyFlag == 0 {
 			n.done = true
 		}
 		ccc = v
 	})
+	return d
+}
+
+// Handle ...
+func (c *Characteristic) Handle(p Property, h Handler) *Characteristic {
+
+	c.value[p&CharRead] = h
+	c.value[p&CharWriteNR] = h
+	c.value[p&CharWrite] = h
+	c.value[p&CharSignedWrite] = h
+	c.value[p&CharExtended] = h
+
+	if p&(CharNotify|CharIndicate) != 0 {
+		setupCCCD(c, h)
+	}
+
+	c.Property |= p
 	return c
 }
 
@@ -184,40 +218,28 @@ type attValue map[Property]Handler
 
 // Handle ...
 func (v attValue) Handle(ctx context.Context, req []byte, resp *att.ResponseWriter) att.Error {
-	central := ctx.Value("central").(*Central)
 	gattResp := &ResponseWriter{resp: resp, status: att.ErrSuccess}
+	var h Handler
 	switch req[0] {
 	case att.ReadRequestCode:
-		h := v[CharRead]
-		if h == nil {
+		if h = v[CharRead]; h == nil {
 			return att.ErrReadNotPerm
 		}
-		r := &Request{Central: central}
-		h.Serve(gattResp, r)
 	case att.ReadBlobRequestCode:
-		h := v[CharRead]
-		if h == nil {
+		if h = v[CharRead]; h != nil {
 			return att.ErrReadNotPerm
 		}
-		offset := att.ReadBlobRequest(req).ValueOffset()
-		r := &Request{Central: central, Offset: int(offset)}
-		h.Serve(gattResp, r)
+		ctx = WithOffset(ctx, int(att.ReadBlobRequest(req).ValueOffset()))
 	case att.WriteRequestCode:
-		h := v[CharWrite]
-		if h == nil {
+		if h = v[CharWrite]; h != nil {
 			return att.ErrWriteNotPerm
 		}
-		data := att.WriteRequest(req).AttributeValue()
-		r := &Request{Central: central, Data: data, Offset: 0}
-		h.Serve(gattResp, r)
+		ctx = WithData(ctx, att.WriteRequest(req).AttributeValue())
 	case att.WriteCommandCode:
-		h := v[CharWriteNR]
-		if h == nil {
+		if h = v[CharWriteNR]; h != nil {
 			return att.ErrWriteNotPerm
 		}
-		data := att.WriteRequest(req).AttributeValue()
-		r := &Request{Central: central, Data: data, Offset: 0}
-		h.Serve(gattResp, r)
+		ctx = WithData(ctx, att.WriteRequest(req).AttributeValue())
 	case att.PrepareWriteRequestCode:
 	case att.ExecuteWriteRequestCode:
 	case att.SignedWriteCommandCode:
@@ -227,17 +249,18 @@ func (v attValue) Handle(ctx context.Context, req []byte, resp *att.ResponseWrit
 	default:
 	}
 
+	h.Serve(ctx, gattResp)
 	return gattResp.status
 }
 
 func (v attValue) setvalue(value []byte) {
-	v[CharRead] = HandlerFunc(func(resp *ResponseWriter, req *Request) {
+	v[CharRead] = HandlerFunc(func(ctx context.Context, resp *ResponseWriter) {
 		resp.Write(value)
 	})
 }
 
 // A Notifier provides a means for a GATT server to send notifications about value changes to a connected device.
-type Notifier struct {
+type notifier struct {
 	char   *Characteristic
 	maxlen int
 	done   bool
@@ -245,16 +268,16 @@ type Notifier struct {
 }
 
 // Write sends data to the central.
-func (n *Notifier) Write(b []byte) (int, error) {
+func (n *notifier) Write(b []byte) (int, error) {
 	return n.send(n.char.vh, b)
 }
 
 // Cap returns the maximum number of bytes that may be sent in a single notification.
-func (n *Notifier) Cap() int { return n.maxlen }
+func (n *notifier) Cap() int { return n.maxlen }
 
 // Done reports whether the central has requested not to receive any more notifications with this notifier.
-func (n *Notifier) Done() bool { return n.done }
-func (n *Notifier) stop()      { n.done = true }
+func (n *notifier) Done() bool { return n.done }
+func (n *notifier) stop()      { n.done = true }
 
 // ResponseWriter ...
 type ResponseWriter struct {
@@ -270,13 +293,13 @@ func (r *ResponseWriter) SetStatus(status att.Error) { r.status = status }
 
 // A Handler handles GATT requests.
 type Handler interface {
-	Serve(resp *ResponseWriter, req *Request)
+	Serve(ctx context.Context, resp *ResponseWriter)
 }
 
 // HandlerFunc is an adapter to allow the use of ordinary functions as Handlers.
-type HandlerFunc func(resp *ResponseWriter, req *Request)
+type HandlerFunc func(ctx context.Context, resp *ResponseWriter)
 
 // Serve returns f(r, maxlen, offset).
-func (f HandlerFunc) Serve(resp *ResponseWriter, req *Request) {
-	f(resp, req)
+func (f HandlerFunc) Serve(ctx context.Context, resp *ResponseWriter) {
+	f(ctx, resp)
 }

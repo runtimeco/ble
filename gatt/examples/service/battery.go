@@ -1,6 +1,9 @@
 package service
 
-import "github.com/currantlabs/bt/gatt"
+import (
+	"github.com/currantlabs/bt/gatt"
+	"golang.org/x/net/context"
+)
 
 // NewBatteryService ...
 func NewBatteryService() *gatt.Service {
@@ -9,7 +12,7 @@ func NewBatteryService() *gatt.Service {
 	c := s.AddCharacteristic(gatt.UUID16(0x2A19))
 	c.Handle(
 		gatt.CharRead,
-		gatt.HandlerFunc(func(rsp *gatt.ResponseWriter, req *gatt.Request) {
+		gatt.HandlerFunc(func(ctx context.Context, rsp *gatt.ResponseWriter) {
 			rsp.Write([]byte{lv})
 			lv--
 		}))
