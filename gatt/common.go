@@ -78,7 +78,7 @@ func (c *Characteristic) Name() string {
 }
 
 // Handle ...
-func (c *Characteristic) Handle(p Property, h Handler) {
+func (c *Characteristic) Handle(p Property, h Handler) *Characteristic {
 	c.Property |= p
 
 	c.value[p&CharRead] = h
@@ -88,7 +88,7 @@ func (c *Characteristic) Handle(p Property, h Handler) {
 	c.value[p&CharExtended] = h
 
 	if p&(CharNotify|CharIndicate) == 0 {
-		return
+		return c
 	}
 
 	d := c.cccd
@@ -133,6 +133,7 @@ func (c *Characteristic) Handle(p Property, h Handler) {
 		}
 		ccc = v
 	})
+	return c
 }
 
 // SetValue ...
@@ -163,15 +164,15 @@ func (d *Descriptor) Name() string {
 }
 
 // Handle ...
-func (d *Descriptor) Handle(p Property, h Handler) {
+func (d *Descriptor) Handle(p Property, h Handler) *Descriptor {
 	if p&^(CharRead|CharWrite|CharWriteNR) != 0 {
 		panic("Invalid Property")
 	}
-	// d.value[0] is dummy.
 	d.value[p&CharRead] = h
 	d.value[p&CharWrite] = h
 	d.value[p&CharWriteNR] = h
 	d.Property |= p
+	return d
 }
 
 // SetValue ...
