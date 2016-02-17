@@ -108,9 +108,9 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 		handlers: map[int]Handler{
 			evt.LEConnectionCompleteEvent{}.SubCode():               HandlerFunc(h.handleLEConnectionComplete),
 			evt.LEAdvertisingReportEvent{}.SubCode():                HandlerFunc(h.handleLEAdvertisingReport),
-			evt.LEConnectionUpdateCompleteEvent{}.SubCode():         HandlerFunc(todo),
+			evt.LEConnectionUpdateCompleteEvent{}.SubCode():         HandlerFunc(h.handleLEConnectionUpdateComplete),
 			evt.LEReadRemoteUsedFeaturesCompleteEvent{}.SubCode():   HandlerFunc(todo),
-			evt.LELongTermKeyRequestEvent{}.SubCode():               HandlerFunc(todo),
+			evt.LELongTermKeyRequestEvent{}.SubCode():               HandlerFunc(h.handleLELongTermKeyRequest),
 			evt.LERemoteConnectionParameterRequestEvent{}.SubCode(): HandlerFunc(todo),
 		},
 	}

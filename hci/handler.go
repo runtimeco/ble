@@ -6,6 +6,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 )
 
@@ -101,6 +102,7 @@ func (h *hci) handleLEMeta(b []byte) {
 func (h *hci) handleLEConnectionComplete(b []byte) {
 	e := &evt.LEConnectionCompleteEvent{}
 	if err := e.Unmarshal(b); err != nil {
+		return
 	}
 
 	c := newConn(h, e)
@@ -110,6 +112,12 @@ func (h *hci) handleLEConnectionComplete(b []byte) {
 	h.chConn <- c
 }
 
+func (h *hci) handleLEConnectionUpdateComplete(b []byte) {
+	e := &evt.LEConnectionUpdateCompleteEvent{}
+	if err := e.Unmarshal(b); err != nil {
+		return
+	}
+}
 func (h *hci) handleDisconnectionComplete(b []byte) {
 	e := &evt.DisconnectionCompleteEvent{}
 	if err := e.Unmarshal(b); err != nil {
@@ -149,6 +157,17 @@ func (h *hci) handleNumberOfCompletedPackets(b []byte) {
 			h.chBufs <- buf
 		}
 	}
+}
+
+func (h *hci) handleLELongTermKeyRequest(b []byte) {
+	e := &evt.LELongTermKeyRequestEvent{}
+	if err := e.Unmarshal(b); err != nil {
+		return
+	}
+
+	h.Send(&cmd.LELongTermKeyRequestNegativeReply{
+		ConnectionHandle: e.ConnectionHandle,
+	}, nil)
 }
 
 func (h *hci) handleLEAdvertisingReport(p []byte) {
