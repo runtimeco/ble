@@ -6,6 +6,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/currantlabs/bt/att"
+	"github.com/currantlabs/bt/uuid"
 )
 
 const (
@@ -64,7 +65,7 @@ const (
 
 // A Service is a BLE service.
 type Service struct {
-	UUID            UUID
+	UUID            uuid.UUID
 	Characteristics []*Characteristic
 
 	h    uint16
@@ -72,12 +73,12 @@ type Service struct {
 }
 
 // NewService ...
-func NewService(u UUID) *Service {
+func NewService(u uuid.UUID) *Service {
 	return &Service{UUID: u}
 }
 
 // AddCharacteristic adds a characteristic to a service.
-func (s *Service) AddCharacteristic(u UUID) *Characteristic {
+func (s *Service) AddCharacteristic(u uuid.UUID) *Characteristic {
 	c := &Characteristic{UUID: u, value: make(map[Property]Handler)}
 	s.Characteristics = append(s.Characteristics, c)
 	return c
@@ -88,7 +89,7 @@ func (s *Service) Name() string { return knownServices[s.UUID.String()].Name }
 
 // A Characteristic is a BLE characteristic.
 type Characteristic struct {
-	UUID        UUID
+	UUID        uuid.UUID
 	Property    Property // enabled properties
 	Descriptors []*Descriptor
 
@@ -162,7 +163,7 @@ func (c *Characteristic) SetValue(value []byte) {
 }
 
 // AddDescriptor adds a descriptor to a characteristic.
-func (c *Characteristic) AddDescriptor(u UUID) *Descriptor {
+func (c *Characteristic) AddDescriptor(u uuid.UUID) *Descriptor {
 	d := &Descriptor{UUID: u, value: make(map[Property]Handler)}
 	c.Descriptors = append(c.Descriptors, d)
 	return d
@@ -170,7 +171,7 @@ func (c *Characteristic) AddDescriptor(u UUID) *Descriptor {
 
 // Descriptor is a BLE descriptor
 type Descriptor struct {
-	UUID     UUID
+	UUID     uuid.UUID
 	Property Property // enabled properties
 
 	h uint16

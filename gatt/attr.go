@@ -1,6 +1,9 @@
 package gatt
 
-import "github.com/currantlabs/bt/att"
+import (
+	"github.com/currantlabs/bt/att"
+	"github.com/currantlabs/bt/uuid"
+)
 
 func generateAttributes(ss []*Service, base uint16) *att.Range {
 	var svrRange []att.Attribute
@@ -21,7 +24,7 @@ func generateServiceAttributes(s *Service, h uint16) (uint16, []att.Attribute) {
 	s.h = h
 	a := att.Attribute{
 		Handle: h,
-		Type:   att.UUID(attrPrimaryServiceUUID),
+		Type:   uuid.UUID(attrPrimaryServiceUUID),
 		Value:  s.UUID,
 	}
 	h++
@@ -43,13 +46,13 @@ func generateCharAttributes(c *Characteristic, h uint16) (uint16, []att.Attribut
 	valueh := c.vh
 	ca := att.Attribute{
 		Handle: h,
-		Type:   att.UUID(attrCharacteristicUUID),
+		Type:   uuid.UUID(attrCharacteristicUUID),
 		Value:  append([]byte{byte(c.Property), byte(valueh), byte((valueh) >> 8)}, c.UUID...),
 	}
 	va := att.Attribute{
 		Handle:       valueh,
 		EndingHandle: valueh,
-		Type:         att.UUID(c.UUID),
+		Type:         uuid.UUID(c.UUID),
 		Pvt:          &c.value,
 	}
 	h += 2
@@ -69,7 +72,7 @@ func generateDescAttributes(d *Descriptor, h uint16) att.Attribute {
 	return att.Attribute{
 		Handle:       h,
 		EndingHandle: h,
-		Type:         att.UUID(d.UUID),
+		Type:         uuid.UUID(d.UUID),
 		Pvt:          &d.value,
 	}
 }

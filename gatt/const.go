@@ -1,23 +1,25 @@
 package gatt
 
+import "github.com/currantlabs/bt/uuid"
+
 var (
-	attrGAPUUID  = UUID16(0x1800)
-	attrGATTUUID = UUID16(0x1801)
+	attrGAPUUID  = uuid.UUID16(0x1800)
+	attrGATTUUID = uuid.UUID16(0x1801)
 
-	attrPrimaryServiceUUID   = UUID16(0x2800)
-	attrSecondaryServiceUUID = UUID16(0x2801)
-	attrIncludeUUID          = UUID16(0x2802)
-	attrCharacteristicUUID   = UUID16(0x2803)
+	attrPrimaryServiceUUID   = uuid.UUID16(0x2800)
+	attrSecondaryServiceUUID = uuid.UUID16(0x2801)
+	attrIncludeUUID          = uuid.UUID16(0x2802)
+	attrCharacteristicUUID   = uuid.UUID16(0x2803)
 
-	attrClientCharacteristicConfigUUID = UUID16(0x2902)
-	attrServerCharacteristicConfigUUID = UUID16(0x2903)
+	attrClientCharacteristicConfigUUID = uuid.UUID16(0x2902)
+	attrServerCharacteristicConfigUUID = uuid.UUID16(0x2903)
 
-	attrDeviceNameUUID        = UUID16(0x2A00)
-	attrAppearanceUUID        = UUID16(0x2A01)
-	attrPeripheralPrivacyUUID = UUID16(0x2A02)
-	attrReconnectionAddrUUID  = UUID16(0x2A03)
-	attrPeferredParamsUUID    = UUID16(0x2A04)
-	attrServiceChangedUUID    = UUID16(0x2A05)
+	attrDeviceNameUUID        = uuid.UUID16(0x2A00)
+	attrAppearanceUUID        = uuid.UUID16(0x2A01)
+	attrPeripheralPrivacyUUID = uuid.UUID16(0x2A02)
+	attrReconnectionAddrUUID  = uuid.UUID16(0x2A03)
+	attrPeferredParamsUUID    = uuid.UUID16(0x2A04)
+	attrServiceChangedUUID    = uuid.UUID16(0x2A05)
 )
 
 const (

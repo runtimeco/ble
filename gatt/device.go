@@ -8,6 +8,7 @@ import (
 	"github.com/currantlabs/bt/hci"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
+	"github.com/currantlabs/bt/uuid"
 )
 
 // State ...
@@ -161,7 +162,7 @@ func (d *Device) Advertise(a *AdvPacket) error {
 
 // AdvertiseNameAndServices advertises Device name, and specified service UUIDs.
 // It tres to fit the UUIDs in the advertising packet as much as possible.
-func (d *Device) AdvertiseNameAndServices(name string, uu []UUID) error {
+func (d *Device) AdvertiseNameAndServices(name string, uu []uuid.UUID) error {
 	a := &AdvPacket{}
 	a.AppendFlags(flagGeneralDiscoverable | flagLEOnly)
 	a.AppendUUIDFit(uu)
@@ -191,11 +192,11 @@ func (d *Device) AdvertiseIBeaconData(b []byte) error {
 }
 
 // AdvertiseIBeacon advertises iBeacon with specified parameters.
-func (d *Device) AdvertiseIBeacon(u UUID, major, minor uint16, pwr int8) error {
+func (d *Device) AdvertiseIBeacon(u uuid.UUID, major, minor uint16, pwr int8) error {
 	b := make([]byte, 23)
 	b[0] = 0x02                               // Data type: iBeacon
 	b[1] = 0x15                               // Data length: 21 bytes
-	copy(b[2:], reverse(u))                   // Big endian
+	copy(b[2:], uuid.Reverse(u))              // Big endian
 	binary.BigEndian.PutUint16(b[18:], major) // Big endian
 	binary.BigEndian.PutUint16(b[20:], minor) // Big endian
 	b[22] = uint8(pwr)                        // Measured Tx Power
@@ -211,7 +212,7 @@ func (d *Device) StopAdvertising() error {
 // If ss is set to nil, all devices scanned are reported.
 // dup specifies weather duplicated advertisement should be reported or not.
 // When a remote peripheral is discovered, the PeripheralDiscovered Handler is called.
-func (d *Device) Scan(ss []UUID, dup bool) {
+func (d *Device) Scan(ss []uuid.UUID, dup bool) {
 	d.hci.Send(&cmd.LESetScanEnable{LEScanEnable: 0}, nil)
 	d.hci.Send(d.scanParam, nil)
 	d.hci.Send(&cmd.LESetScanEnable{LEScanEnable: 1}, nil)

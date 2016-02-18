@@ -1,4 +1,4 @@
-package gatt
+package uuid
 
 import (
 	"bytes"
@@ -18,9 +18,9 @@ func UUID16(i uint16) UUID {
 	return UUID(b)
 }
 
-// ParseUUID parses a standard-format UUID string, such
+// Parse parses a standard-format UUID string, such
 // as "1800" or "34DA3AD1-7110-41A1-B1EF-4430F509CDE7".
-func ParseUUID(s string) (UUID, error) {
+func Parse(s string) (UUID, error) {
 	s = strings.Replace(s, "-", "", -1)
 	b, err := hex.DecodeString(s)
 	if err != nil {
@@ -29,13 +29,13 @@ func ParseUUID(s string) (UUID, error) {
 	if err := lenErr(len(b)); err != nil {
 		return nil, err
 	}
-	return UUID(reverse(b)), nil
+	return UUID(Reverse(b)), nil
 }
 
-// MustParseUUID parses a standard-format UUID string,
-// like ParseUUID, but panics in case of error.
-func MustParseUUID(s string) UUID {
-	u, err := ParseUUID(s)
+// MustParse parses a standard-format UUID string,
+// like Parse, but panics in case of error.
+func MustParse(s string) UUID {
+	u, err := Parse(s)
 	if err != nil {
 		panic(err)
 	}
@@ -56,13 +56,13 @@ func lenErr(n int) error {
 func (u UUID) Len() int { return len(u) }
 
 // String hex-encodes a UUID.
-func (u UUID) String() string { return fmt.Sprintf("%X", reverse(u)) }
+func (u UUID) String() string { return fmt.Sprintf("%X", Reverse(u)) }
 
 // Equal returns a boolean reporting whether v represent the same UUID as u.
 func (u UUID) Equal(v UUID) bool { return bytes.Equal(u, v) }
 
-// UUIDContains returns a boolean reporting whether u is in the slice s.
-func UUIDContains(s []UUID, u UUID) bool {
+// Contains returns a boolean reporting whether u is in the slice s.
+func Contains(s []UUID, u UUID) bool {
 	if s == nil {
 		return true
 	}
@@ -76,8 +76,8 @@ func UUIDContains(s []UUID, u UUID) bool {
 	return false
 }
 
-// reverse returns a reversed copy of u.
-func reverse(u []byte) []byte {
+// Reverse returns a reversed copy of u.
+func Reverse(u []byte) []byte {
 	// Special-case 16 bit UUIDS for speed.
 	l := len(u)
 	if l == 2 {

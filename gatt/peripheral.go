@@ -7,6 +7,7 @@ import (
 
 	"github.com/currantlabs/bt/att"
 	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/uuid"
 )
 
 // Peripheral represent a remote peripheral device.
@@ -64,10 +65,10 @@ func newPeripheral(d *Device, l2c hci.Conn) *Peripheral {
 // DiscoverServices discovers all the primary service on a server. [Vol 3, Parg G, 4.4.1]
 // DiscoverServices discover the specified services of the remote peripheral.
 // If the specified services is set to nil, all the available services of the remote peripheral are returned.
-func (p *Peripheral) DiscoverServices(filter []UUID) ([]*Service, error) {
+func (p *Peripheral) DiscoverServices(filter []uuid.UUID) ([]*Service, error) {
 	start := uint16(0x0001)
 	for {
-		length, b, err := p.c.ReadByGroupType(start, 0xFFFF, att.UUID(attrPrimaryServiceUUID))
+		length, b, err := p.c.ReadByGroupType(start, 0xFFFF, uuid.UUID(attrPrimaryServiceUUID))
 		if err == att.ErrAttrNotFound {
 			return p.svcs, nil
 		}
@@ -77,8 +78,8 @@ func (p *Peripheral) DiscoverServices(filter []UUID) ([]*Service, error) {
 		for len(b) != 0 {
 			h := binary.LittleEndian.Uint16(b[:2])
 			endh := binary.LittleEndian.Uint16(b[2:4])
-			u := UUID(b[4:length])
-			if filter == nil || UUIDContains(filter, u) {
+			u := uuid.UUID(b[4:length])
+			if filter == nil || uuid.Contains(filter, u) {
 				p.svcs = append(p.svcs, &Service{UUID: u, h: h, endh: endh})
 			}
 			if endh == 0xFFFF {
@@ -92,17 +93,17 @@ func (p *Peripheral) DiscoverServices(filter []UUID) ([]*Service, error) {
 
 // DiscoverIncludedServices discovers the specified included services of a service.
 // If the specified services is set to nil, all the included services of the service are returned.
-func (p *Peripheral) DiscoverIncludedServices(ss []UUID, s *Service) ([]*Service, error) {
+func (p *Peripheral) DiscoverIncludedServices(ss []uuid.UUID, s *Service) ([]*Service, error) {
 	return nil, nil
 }
 
 // DiscoverCharacteristics discovers the specified characteristics of a service.
 // If the specified characterstics is set to nil, all the characteristic of the service are returned.
-func (p *Peripheral) DiscoverCharacteristics(filter []UUID, s *Service) ([]*Characteristic, error) {
+func (p *Peripheral) DiscoverCharacteristics(filter []uuid.UUID, s *Service) ([]*Characteristic, error) {
 	start := s.h
 	var lastChar *Characteristic
 	for start <= s.endh {
-		length, b, err := p.c.ReadByType(start, s.endh, att.UUID(attrCharacteristicUUID))
+		length, b, err := p.c.ReadByType(start, s.endh, uuid.UUID(attrCharacteristicUUID))
 		if err == att.ErrAttrNotFound {
 			break
 		} else if err != nil {
@@ -112,9 +113,9 @@ func (p *Peripheral) DiscoverCharacteristics(filter []UUID, s *Service) ([]*Char
 			h := binary.LittleEndian.Uint16(b[:2])
 			props := Property(b[2])
 			vh := binary.LittleEndian.Uint16(b[3:5])
-			u := UUID(b[5:length])
+			u := uuid.UUID(b[5:length])
 			c := &Characteristic{UUID: u, Property: props, h: h, vh: vh, endh: s.endh}
-			if filter == nil || UUIDContains(filter, u) {
+			if filter == nil || uuid.Contains(filter, u) {
 				s.Characteristics = append(s.Characteristics, c)
 			}
 			if lastChar != nil {
@@ -130,7 +131,7 @@ func (p *Peripheral) DiscoverCharacteristics(filter []UUID, s *Service) ([]*Char
 
 // DiscoverDescriptors discovers the descriptors of a characteristic.
 // If the specified descriptors is set to nil, all the descriptors of the characteristic are returned.
-func (p *Peripheral) DiscoverDescriptors(filter []UUID, c *Characteristic) ([]*Descriptor, error) {
+func (p *Peripheral) DiscoverDescriptors(filter []uuid.UUID, c *Characteristic) ([]*Descriptor, error) {
 	start := c.vh + 1
 	for start <= c.endh {
 		fmt, b, err := p.c.FindInformation(start, c.endh)
@@ -145,9 +146,9 @@ func (p *Peripheral) DiscoverDescriptors(filter []UUID, c *Characteristic) ([]*D
 		}
 		for len(b) != 0 {
 			h := binary.LittleEndian.Uint16(b[:2])
-			u := UUID(b[2:length])
+			u := uuid.UUID(b[2:length])
 			d := &Descriptor{UUID: u, h: h}
-			if filter == nil || UUIDContains(filter, u) {
+			if filter == nil || uuid.Contains(filter, u) {
 				c.Descriptors = append(c.Descriptors, d)
 			}
 			if u.Equal(attrClientCharacteristicConfigUUID) {

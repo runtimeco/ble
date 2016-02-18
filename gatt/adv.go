@@ -2,6 +2,8 @@ package gatt
 
 import (
 	"errors"
+
+	"github.com/currantlabs/bt/uuid"
 )
 
 // MaxEIRPacketLength is the maximum allowed AdvertisingPacket
@@ -58,7 +60,7 @@ const (
 
 // FIXME: check the unmarshalling of this data structure.
 type ServiceData struct {
-	UUID UUID
+	UUID uuid.UUID
 	Data []byte
 }
 
@@ -68,27 +70,27 @@ type Advertisement struct {
 	LocalName        string
 	ManufacturerData []byte
 	ServiceData      []ServiceData
-	Services         []UUID
-	OverflowService  []UUID
+	Services         []uuid.UUID
+	OverflowService  []uuid.UUID
 	TxPowerLevel     int
 	Connectable      bool
-	SolicitedService []UUID
+	SolicitedService []uuid.UUID
 }
 
 // This is only used in Linux port.
 func (a *Advertisement) unmarshall(b []byte) error {
 
 	// Utility function for creating a list of uuids.
-	uuidList := func(u []UUID, d []byte, w int) []UUID {
+	uuidList := func(u []uuid.UUID, d []byte, w int) []uuid.UUID {
 		for len(d) > 0 {
-			u = append(u, UUID(d[:w]))
+			u = append(u, uuid.UUID(d[:w]))
 			d = d[w:]
 		}
 		return u
 	}
 
 	serviceDataList := func(sd []ServiceData, d []byte, w int) []ServiceData {
-		serviceData := ServiceData{UUID(d[:w]), make([]byte, len(d)-w)}
+		serviceData := ServiceData{uuid.UUID(d[:w]), make([]byte, len(d)-w)}
 		copy(serviceData.Data, d[2:])
 		return append(sd, serviceData)
 	}
@@ -202,7 +204,7 @@ func (a *AdvPacket) AppendManufacturerData(id uint16, b []byte) *AdvPacket {
 
 // AppendUUIDFit appends a BLE advertised service UUID
 // packet field if it fits in the packet, and reports whether the UUID fit.
-func (a *AdvPacket) AppendUUIDFit(uu []UUID) bool {
+func (a *AdvPacket) AppendUUIDFit(uu []uuid.UUID) bool {
 	// Iterate all UUIDs to see if they fit in the packet or not.
 	fit, l := true, len(a.b)
 	for _, u := range uu {

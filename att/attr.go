@@ -5,14 +5,16 @@ import (
 	"io"
 	"log"
 
+	"github.com/currantlabs/bt/uuid"
+
 	"golang.org/x/net/context"
 )
 
 // Attribute is a BLE attribute.
 type Attribute struct {
-	Handle       uint16 // Handle
-	EndingHandle uint16 // Group EndingHandle
-	Type         UUID   // Type (in UUID)
+	Handle       uint16    // Handle
+	EndingHandle uint16    // Group EndingHandle
+	Type         uuid.UUID // Type (in UUID)
 
 	Value []byte // Staic and read-only Value
 	Pvt   Value  // Handler from upper layer, such as GATT.

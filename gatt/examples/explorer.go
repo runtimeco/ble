@@ -12,6 +12,7 @@ import (
 
 	"github.com/currantlabs/bt/gatt"
 	"github.com/currantlabs/bt/gatt/examples/option"
+	"github.com/currantlabs/bt/uuid"
 )
 
 var done = make(chan struct{})
@@ -21,7 +22,7 @@ func onStateChanged(d *gatt.Device, s gatt.State) {
 	switch s {
 	case gatt.StatePoweredOn:
 		fmt.Println("Scanning...")
-		d.Scan([]gatt.UUID{}, false)
+		d.Scan([]uuid.UUID{}, false)
 		return
 	default:
 		d.StopScanning()

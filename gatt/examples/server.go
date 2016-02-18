@@ -9,6 +9,7 @@ import (
 	"github.com/currantlabs/bt/gatt"
 	"github.com/currantlabs/bt/gatt/examples/option"
 	"github.com/currantlabs/bt/gatt/examples/service"
+	"github.com/currantlabs/bt/uuid"
 )
 
 func main() {
@@ -36,10 +37,10 @@ func main() {
 			s2 := d.AddService(service.NewBatteryService())
 
 			// Advertise device name and service's UUIDs.
-			d.AdvertiseNameAndServices("Gopher", []gatt.UUID{s1.UUID, s2.UUID})
+			d.AdvertiseNameAndServices("Gopher", []uuid.UUID{s1.UUID, s2.UUID})
 
 			// Advertise as an OpenBeacon iBeacon
-			d.AdvertiseIBeacon(gatt.MustParseUUID("AA6062F098CA42118EC4193EB73CCEB6"), 1, 2, -59)
+			d.AdvertiseIBeacon(uuid.MustParse("AA6062F098CA42118EC4193EB73CCEB6"), 1, 2, -59)
 		default:
 		}
 	}

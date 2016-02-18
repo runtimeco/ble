@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/uuid"
 )
 
 var (
@@ -159,7 +160,7 @@ func (c *Client) FindInformation(starth, endh uint16) (fmt int, data []byte, err
 
 // ReadByType obtains the values of attributes where the attribute type is known
 // but the handle is not known. [Vol 3, Part F, 3.4.4.1 & 3.4.4.2]
-func (c *Client) ReadByType(starth, endh uint16, uuid UUID) (int, []byte, error) {
+func (c *Client) ReadByType(starth, endh uint16, uuid uuid.UUID) (int, []byte, error) {
 	if starth > endh || (len(uuid) != 2 && len(uuid) != 16) {
 		return 0, nil, ErrInvalidArgument
 	}
@@ -307,7 +308,7 @@ func (c *Client) ReadMultiple(handles []uint16) ([]byte, error) {
 // ReadByGroupType obtains the values of attributes where the attribute type is known,
 // the type of a grouping attribute as defined by a higher layer specification, but
 // the handle is not known. [Vol 3, Part F, 3.4.4.9 & 3.4.4.10]
-func (c *Client) ReadByGroupType(starth, endh uint16, uuid UUID) (int, []byte, error) {
+func (c *Client) ReadByGroupType(starth, endh uint16, uuid uuid.UUID) (int, []byte, error) {
 	if starth > endh || (len(uuid) != 2 && len(uuid) != 16) {
 		return 0, nil, ErrInvalidArgument
 	}

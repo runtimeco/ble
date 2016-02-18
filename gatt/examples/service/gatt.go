@@ -1,10 +1,13 @@
 package service
 
-import "github.com/currantlabs/bt/gatt"
+import (
+	"github.com/currantlabs/bt/gatt"
+	"github.com/currantlabs/bt/uuid"
+)
 
 var (
-	attrGATTUUID           = gatt.UUID16(0x1801)
-	attrServiceChangedUUID = gatt.UUID16(0x2A05)
+	attrGATTUUID           = uuid.UUID16(0x1801)
+	attrServiceChangedUUID = uuid.UUID16(0x2A05)
 )
 
 // NewGattService ...

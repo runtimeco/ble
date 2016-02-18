@@ -15,7 +15,7 @@ func onStateChanged(d gatt.Device, s gatt.State) {
 	switch s {
 	case gatt.StatePoweredOn:
 		fmt.Println("scanning...")
-		d.Scan([]gatt.UUID{}, false)
+		d.Scan([]uuid.UUID{}, false)
 		return
 	default:
 		d.StopScanning()

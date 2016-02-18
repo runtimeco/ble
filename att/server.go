@@ -9,6 +9,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/uuid"
 )
 
 // Server implementas an ATT (Attribute Protocol) server.
@@ -260,7 +261,7 @@ func (s *Server) handleFindByTypeValueRequest(r FindByTypeValueRequest) []byte {
 			}
 			endh = a.Handle
 		}
-		if !(UUID(v).Equal(UUID(r.AttributeValue()))) {
+		if !(uuid.UUID(v).Equal(uuid.UUID(r.AttributeValue()))) {
 			continue
 		}
 		if buf.Len()+4 > buf.Cap() {
@@ -295,7 +296,7 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 	// Each response shall only contains values with the same size.
 	dlen := 0
 	for _, a := range s.attrs.subrange(r.StartingHandle(), r.EndingHandle()) {
-		if !a.Type.Equal(UUID(r.AttributeType())) {
+		if !a.Type.Equal(uuid.UUID(r.AttributeType())) {
 			continue
 		}
 		v := a.Value
