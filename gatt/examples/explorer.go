@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/currantlabs/bt/adv"
 	"github.com/currantlabs/bt/gatt"
 	"github.com/currantlabs/bt/gatt/examples/option"
 	"github.com/currantlabs/bt/uuid"
@@ -29,7 +30,7 @@ func onStateChanged(d *gatt.Device, s gatt.State) {
 	}
 }
 
-func onPeriphDiscovered(p *gatt.Peripheral, a *gatt.Advertisement, rssi int) {
+func onPeriphDiscovered(p *gatt.Peripheral, a *adv.Packet, rssi int) {
 	id := strings.ToUpper(flag.Args()[0])
 	if strings.ToUpper(p.ID()) != id {
 		return
@@ -39,10 +40,10 @@ func onPeriphDiscovered(p *gatt.Peripheral, a *gatt.Advertisement, rssi int) {
 	p.Device().StopScanning()
 
 	fmt.Printf("\nPeripheral ID:%s, NAME:(%s)\n", p.ID(), p.Name())
-	fmt.Println("  Local Name        =", a.LocalName)
-	fmt.Println("  TX Power Level    =", a.TxPowerLevel)
-	fmt.Println("  Manufacturer Data =", a.ManufacturerData)
-	fmt.Println("  Service Data      =", a.ServiceData)
+	fmt.Printf("  Local Name        = %s\n", a.LocalName())
+	fmt.Printf("  Manufacturer Data = %X\n", a.ManufacturerData())
+	fmt.Printf("  UUID              = %v\n", a.UUIDs())
+	fmt.Printf("  RAW               = %X\n", a.Bytes())
 	fmt.Println("")
 
 	p.Device().Connect(p)

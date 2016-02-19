@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"log"
 
+	"github.com/currantlabs/bt/adv"
 	"github.com/currantlabs/bt/att"
 	"github.com/currantlabs/bt/hci"
 	"github.com/currantlabs/bt/hci/cmd"
@@ -36,7 +37,7 @@ type deviceHandler struct {
 	CentralDisconnected func(c *Central)
 
 	// PeripheralDiscovered is called when a remote peripheral Device is found during scan procedure.
-	PeripheralDiscovered func(p *Peripheral, a *Advertisement, rssi int)
+	PeripheralDiscovered func(p *Peripheral, a *adv.Packet, rssi int)
 
 	// PeripheralConnected is called when a remote peripheral is conneted.
 	PeripheralConnected func(p *Peripheral, err error)
@@ -147,10 +148,10 @@ func (d *Device) SetServices(s []*Service) error {
 
 // Advertise advertise AdvPacket
 // If name doesn't fit in the advertising packet, it will be put in scan response.
-func (d *Device) Advertise(a *AdvPacket) error {
+func (d *Device) Advertise(a *adv.Packet) error {
 	d.advData = &cmd.LESetAdvertisingData{
 		AdvertisingDataLength: uint8(a.Len()),
-		AdvertisingData:       a.Bytes(),
+		AdvertisingData:       a.Packet(),
 	}
 
 	d.hci.Send(&cmd.LESetAdvertiseEnable{AdvertisingEnable: 0}, nil)
@@ -163,29 +164,32 @@ func (d *Device) Advertise(a *AdvPacket) error {
 // AdvertiseNameAndServices advertises Device name, and specified service UUIDs.
 // It tres to fit the UUIDs in the advertising packet as much as possible.
 func (d *Device) AdvertiseNameAndServices(name string, uu []uuid.UUID) error {
-	a := &AdvPacket{}
-	a.AppendFlags(flagGeneralDiscoverable | flagLEOnly)
+	a := adv.NewAdvPacket(nil)
+	a.AppendFlags(adv.FlagGeneralDiscoverable | adv.FlagLEOnly)
 	a.AppendUUIDFit(uu)
 
-	if len(a.b)+len(name)+2 < MaxEIRPacketLength {
+	if a.Len()+len(name)+2 < adv.MaxEIRPacketLength {
 		a.AppendName(name)
 		d.scanResp = nil
+		log.Printf("ADV1: [ % X ]", a.Bytes())
 	} else {
-		a := &AdvPacket{}
+		a := adv.NewAdvPacket(nil)
 		a.AppendName(name)
 		d.scanResp = &cmd.LESetScanResponseData{
 			ScanResponseDataLength: uint8(a.Len()),
-			ScanResponseData:       a.Bytes(),
+			ScanResponseData:       a.Packet(),
 		}
+		log.Printf("ADV2: [ % X ]", a.Bytes())
 	}
 
+	log.Printf("ADV3: [ % X ]", a.Bytes())
 	return d.Advertise(a)
 }
 
 // AdvertiseIBeaconData advertise iBeacon with given manufacturer data.
 func (d *Device) AdvertiseIBeaconData(b []byte) error {
-	a := &AdvPacket{}
-	a.AppendFlags(flagGeneralDiscoverable | flagLEOnly)
+	a := adv.NewAdvPacket(nil)
+	a.AppendFlags(adv.FlagGeneralDiscoverable | adv.FlagLEOnly)
 	a.AppendManufacturerData(0x004C, b)
 
 	return d.Advertise(a)
@@ -285,9 +289,7 @@ func (d *Device) handleLEAdvertisingReport(b []byte) {
 	}
 
 	for _, r := range e.Reports {
-		adv := &Advertisement{}
-		adv.unmarshall(r.Data)
-		adv.Connectable = r.EventType&0x01 == 0x01
+		adv := adv.NewAdvPacket(r.Data)
 
 		a := r.Address
 		p := &Peripheral{

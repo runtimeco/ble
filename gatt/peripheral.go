@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/currantlabs/bt/adv"
 	"github.com/currantlabs/bt/att"
 	"github.com/currantlabs/bt/hci"
 	"github.com/currantlabs/bt/uuid"
@@ -23,7 +24,7 @@ type Peripheral struct {
 	svcs []*Service
 
 	name      string
-	adv       *Advertisement
+	adv       *adv.Packet
 	advReport *advertisingReport
 	addr      net.HardwareAddr
 
