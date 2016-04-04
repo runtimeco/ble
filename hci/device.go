@@ -7,9 +7,26 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/currantlabs/bt/hci/gioctl"
 	"github.com/currantlabs/bt/hci/socket"
 )
+
+// IoR used for an ioctl that reads data from the device driver.
+func ioR(t, nr, size uintptr) uintptr {
+	return (2 << 30) | (t << 8) | nr | (size << 16)
+}
+
+// IoW used for an ioctl that writes data to the device driver.
+func ioW(t, nr, size uintptr) uintptr {
+	return (1 << 30) | (t << 8) | nr | (size << 16)
+}
+
+// Ioctl simplified ioct call
+func ioctl(fd, op, arg uintptr) error {
+	if _, _, ep := syscall.Syscall(syscall.SYS_IOCTL, fd, op, arg); ep != 0 {
+		return syscall.Errno(ep)
+	}
+	return nil
+}
 
 const (
 	ioctlSize     = uintptr(4)
@@ -18,11 +35,11 @@ const (
 )
 
 var (
-	hciUpDevice      = gioctl.IoW(typHCI, 201, ioctlSize) // HCIDEVUP
-	hciDownDevice    = gioctl.IoW(typHCI, 202, ioctlSize) // HCIDEVDOWN
-	hciResetDevice   = gioctl.IoW(typHCI, 203, ioctlSize) // HCIDEVRESET
-	hciGetDeviceList = gioctl.IoR(typHCI, 210, ioctlSize) // HCIGETDEVLIST
-	hciGetDeviceInfo = gioctl.IoR(typHCI, 211, ioctlSize) // HCIGETDEVINFO
+	hciUpDevice      = ioW(typHCI, 201, ioctlSize) // HCIDEVUP
+	hciDownDevice    = ioW(typHCI, 202, ioctlSize) // HCIDEVDOWN
+	hciResetDevice   = ioW(typHCI, 203, ioctlSize) // HCIDEVRESET
+	hciGetDeviceList = ioR(typHCI, 210, ioctlSize) // HCIGETDEVLIST
+	hciGetDeviceInfo = ioR(typHCI, 211, ioctlSize) // HCIGETDEVINFO
 )
 
 type devRequest struct {
@@ -83,7 +100,7 @@ func newDevice(n int, chk bool) (*device, error) {
 	}
 
 	req := devListRequest{devNum: hciMaxDevices}
-	if err := gioctl.Ioctl(uintptr(fd), hciGetDeviceList, uintptr(unsafe.Pointer(&req))); err != nil {
+	if err := ioctl(uintptr(fd), hciGetDeviceList, uintptr(unsafe.Pointer(&req))); err != nil {
 		return nil, err
 	}
 	for i := 0; i < int(req.devNum); i++ {
@@ -98,7 +115,7 @@ func newDevice(n int, chk bool) (*device, error) {
 
 func newSocket(fd, n int, chk bool) (*device, error) {
 	i := hciDevInfo{id: uint16(n)}
-	if err := gioctl.Ioctl(uintptr(fd), hciGetDeviceInfo, uintptr(unsafe.Pointer(&i))); err != nil {
+	if err := ioctl(uintptr(fd), hciGetDeviceInfo, uintptr(unsafe.Pointer(&i))); err != nil {
 		return nil, err
 	}
 	name := string(i.name[:])
@@ -109,17 +126,17 @@ func newSocket(fd, n int, chk bool) (*device, error) {
 		return nil, err
 	}
 	log.Printf("dev: %s up", name)
-	if err := gioctl.Ioctl(uintptr(fd), hciUpDevice, uintptr(n)); err != nil {
+	if err := ioctl(uintptr(fd), hciUpDevice, uintptr(n)); err != nil {
 		if err != syscall.EALREADY {
 			return nil, err
 		}
 		log.Printf("dev: %s reset", name)
-		if err := gioctl.Ioctl(uintptr(fd), hciResetDevice, uintptr(n)); err != nil {
+		if err := ioctl(uintptr(fd), hciResetDevice, uintptr(n)); err != nil {
 			return nil, err
 		}
 	}
 	log.Printf("dev: %s down", name)
-	if err := gioctl.Ioctl(uintptr(fd), hciDownDevice, uintptr(n)); err != nil {
+	if err := ioctl(uintptr(fd), hciDownDevice, uintptr(n)); err != nil {
 		return nil, err
 	}
 

@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/currantlabs/bt/adv"
 	"github.com/currantlabs/bt/gatt"
 	"github.com/currantlabs/bt/gatt/examples/option"
+	"github.com/currantlabs/bt/uuid"
 )
 
-func onStateChanged(d gatt.Device, s gatt.State) {
+func onStateChanged(d *gatt.Device, s gatt.State) {
 	fmt.Println("State:", s)
 	switch s {
 	case gatt.StatePoweredOn:
@@ -22,12 +24,9 @@ func onStateChanged(d gatt.Device, s gatt.State) {
 	}
 }
 
-func onPeriphDiscovered(p gatt.Peripheral, a *gatt.Advertisement, rssi int) {
+func onPeriphDiscovered(p *gatt.Peripheral, a *adv.Packet, rssi int) {
 	fmt.Printf("\nPeripheral ID:%s, NAME:(%s)\n", p.ID(), p.Name())
-	fmt.Println("  Local Name        =", a.LocalName)
-	fmt.Println("  TX Power Level    =", a.TxPowerLevel)
-	fmt.Println("  Manufacturer Data =", a.ManufacturerData)
-	fmt.Println("  Service Data      =", a.ServiceData)
+	fmt.Printf("\npkt: %X %v, %s", a, a.UUIDs(), a.LocalName())
 }
 
 func main() {
@@ -38,7 +37,7 @@ func main() {
 	}
 
 	// Register handlers.
-	d.Handle(gatt.PeripheralDiscovered(onPeriphDiscovered))
+	d.PeripheralDiscovered = onPeriphDiscovered
 	d.Init(onStateChanged)
 	select {}
 }
