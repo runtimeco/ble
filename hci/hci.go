@@ -18,7 +18,7 @@ type HCI interface {
 	EventHandler
 
 	// Accept returns L2CAP connection.
-	Accept() (Conn, error)
+	Accept() (l2cap.Conn, error)
 
 	// LocalAddr returns the MAC address of local device.
 	LocalAddr() net.HardwareAddr
@@ -75,10 +75,10 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 		sentCmds:  make(map[int]*cmdPkt),
 
 		muConns: &sync.Mutex{},
-		conns:   map[uint16]*conn{},
+		conns:   make(map[uint16]l2cap.Conn),
 
 		muACL:  &sync.Mutex{},
-		chConn: make(chan *conn),
+		chConn: make(chan l2cap.Conn),
 
 		// Currently, we only supports BLE, and the sole user is ATT/GATT.
 		// For BLE, the ATT_MTU has a default (and mandantory minimum) of 23 bytes,
@@ -338,6 +338,6 @@ func (h *hci) Init() error {
 }
 
 // Accept returns a L2CAP connections.
-func (h *hci) Accept() (Conn, error) {
+func (h *hci) Accept() (l2cap.Conn, error) {
 	return <-h.chConn, nil
 }

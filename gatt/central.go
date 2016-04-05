@@ -4,16 +4,16 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/currantlabs/bt/att"
-	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/l2cap"
 )
 
 // Central is the interface that represent a remote central device.
 type Central struct {
-	l2c    hci.Conn
+	l2c    l2cap.Conn
 	server *att.Server
 }
 
-func newCentral(a *att.Range, l2c hci.Conn) *Central {
+func newCentral(a *att.Range, l2c l2cap.Conn) *Central {
 	c := &Central{
 		l2c: l2c,
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/currantlabs/bt/hci"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
+	"github.com/currantlabs/bt/l2cap"
 	"github.com/currantlabs/bt/uuid"
 )
 
@@ -257,7 +258,7 @@ func (d *Device) acceptLoop() {
 	}
 }
 
-func (d *Device) handleCentral(l2c hci.Conn) {
+func (d *Device) handleCentral(l2c l2cap.Conn) {
 	c := newCentral(d.attrs, l2c)
 	if d.CentralConnected != nil {
 		d.CentralConnected(c)
@@ -269,7 +270,7 @@ func (d *Device) handleCentral(l2c hci.Conn) {
 	d.hci.Send(&cmd.LESetAdvertiseEnable{AdvertisingEnable: 1}, nil)
 }
 
-func (d *Device) handlePeripheral(l2c hci.Conn) {
+func (d *Device) handlePeripheral(l2c l2cap.Conn) {
 	p := newPeripheral(d, l2c)
 	if d.PeripheralConnected != nil {
 		go d.PeripheralConnected(p, nil)

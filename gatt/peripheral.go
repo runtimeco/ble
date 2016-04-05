@@ -7,7 +7,7 @@ import (
 
 	"github.com/currantlabs/bt/adv"
 	"github.com/currantlabs/bt/att"
-	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/l2cap"
 	"github.com/currantlabs/bt/uuid"
 )
 
@@ -53,7 +53,7 @@ func (p *Peripheral) Services() []*Service {
 	return p.svcs
 }
 
-func newPeripheral(d *Device, l2c hci.Conn) *Peripheral {
+func newPeripheral(d *Device, l2c l2cap.Conn) *Peripheral {
 	h := newNHandler()
 	p := &Peripheral{
 		d:       d,

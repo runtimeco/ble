@@ -8,13 +8,13 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/l2cap"
 	"github.com/currantlabs/bt/uuid"
 )
 
 // Server implementas an ATT (Attribute Protocol) server.
 type Server struct {
-	l2c   hci.Conn
+	l2c   l2cap.Conn
 	ctx   context.Context
 	attrs *Range
 
@@ -28,7 +28,7 @@ type Server struct {
 }
 
 // NewServer returns an ATT (Attribute Protocol) server.
-func NewServer(ctx context.Context, a *Range, l2c hci.Conn, rxMTU int) *Server {
+func NewServer(ctx context.Context, a *Range, l2c l2cap.Conn, rxMTU int) *Server {
 	// Although the rxBuf is initialized with the capacity of rxMTU, it is
 	// not discovered, and only the default ATT_MTU (23 bytes) of it shall
 	// be used until remote central request ExchangeMTU.

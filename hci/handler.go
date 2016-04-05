@@ -8,6 +8,7 @@ import (
 
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
+	"github.com/currantlabs/bt/l2cap"
 )
 
 type dispatcher struct {

@@ -16,7 +16,6 @@ import (
 // Currently, it only supports LE-U logical transport, and not ACL-U.
 type Conn interface {
 	io.ReadWriteCloser
-	cmd.Sender
 
 	// LocalAddr returns local device's MAC address.
 	LocalAddr() net.HardwareAddr

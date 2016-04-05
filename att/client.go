@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/l2cap"
 	"github.com/currantlabs/bt/uuid"
 )
 
@@ -30,7 +30,7 @@ type NotificationHandler interface {
 
 // Client implementa an Attribute Protocol Client.
 type Client struct {
-	Conn hci.Conn
+	Conn l2cap.Conn
 	rspc chan []byte
 
 	rxBuf   []byte
@@ -40,7 +40,7 @@ type Client struct {
 }
 
 // NewClient returns an Attribute Protocol Client.
-func NewClient(l2c hci.Conn, h NotificationHandler) *Client {
+func NewClient(l2c l2cap.Conn, h NotificationHandler) *Client {
 	c := &Client{
 		Conn:    l2c,
 		rspc:    make(chan []byte),
