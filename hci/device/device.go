@@ -1,4 +1,4 @@
-package hci
+package device
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/currantlabs/bt/hci/socket"
+	"github.com/currantlabs/bt/hci/device/socket"
 )
 
 // IoR used for an ioctl that reads data from the device driver.
@@ -90,7 +90,8 @@ type device struct {
 	wmu  *sync.Mutex
 }
 
-func newDevice(n int, chk bool) (*device, error) {
+// NewDevice returns ...
+func NewDevice(n int, chk bool) (*device, error) {
 	fd, err := socket.Socket(socket.AF_BLUETOOTH, syscall.SOCK_RAW, socket.BTPROTO_HCI)
 	if err != nil {
 		return nil, err

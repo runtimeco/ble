@@ -7,6 +7,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/currantlabs/bt/hci/cmd"
+	"github.com/currantlabs/bt/hci/device"
 	"github.com/currantlabs/bt/hci/evt"
 )
 
@@ -60,7 +61,7 @@ type hci struct {
 
 // NewHCI ...
 func NewHCI(devID int, chk bool) (HCI, error) {
-	dev, err := newDevice(devID, chk)
+	dev, err := device.NewDevice(devID, chk)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,6 @@
 // +build devel
 
-package hci
+package device
 
 import (
 	"errors"
@@ -90,7 +90,8 @@ type device struct {
 	wmu  *sync.Mutex
 }
 
-func newDevice(n int, chk bool) (*device, error) {
+// NewDevice ...
+func NewDevice(n int, chk bool) (*device, error) {
 	fd, err := syscall.Socket(syscall.AF_BLUETOOTH, syscall.SOCK_RAW, syscall.BTPROTO_HCI)
 	if err != nil {
 		return nil, err
