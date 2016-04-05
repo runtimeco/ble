@@ -9,6 +9,7 @@ import (
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/device"
 	"github.com/currantlabs/bt/hci/evt"
+	"github.com/currantlabs/bt/l2cap"
 )
 
 // HCI ...
@@ -48,10 +49,10 @@ type hci struct {
 
 	// L2CAP connections
 	muConns *sync.Mutex
-	conns   map[uint16]*conn
+	conns   map[uint16]l2cap.Conn
 
 	muACL  *sync.Mutex
-	chConn chan *conn
+	chConn chan l2cap.Conn
 	mps    int // Maximum PDU Payload Size (MPS)
 
 	// Device information or status
@@ -334,4 +335,9 @@ func (h *hci) Init() error {
 	}
 
 	return nil
+}
+
+// Accept returns a L2CAP connections.
+func (h *hci) Accept() (Conn, error) {
+	return <-h.chConn, nil
 }

@@ -1,4 +1,4 @@
-package hci
+package l2cap
 
 import (
 	"bytes"

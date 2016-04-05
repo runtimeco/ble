@@ -1,4 +1,4 @@
-package hci
+package l2cap
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 )
 
@@ -15,6 +16,7 @@ import (
 // Currently, it only supports LE-U logical transport, and not ACL-U.
 type Conn interface {
 	io.ReadWriteCloser
+	cmd.Sender
 
 	// LocalAddr returns local device's MAC address.
 	LocalAddr() net.HardwareAddr
@@ -38,8 +40,8 @@ type Conn interface {
 }
 
 type conn struct {
-	hci   *hci
-	param *evt.LEConnectionCompleteEvent
+	sender cmd.Sender
+	param  *evt.LEConnectionCompleteEvent
 
 	// Maximum Transmission Unit (MTU) is the maximum size of payload data
 	// which the upper layer entity is capable of accepting. [Vol 3, Part A, 1.4]
@@ -85,10 +87,10 @@ type conn struct {
 	leFrame bool
 }
 
-func newConn(h *hci, param *evt.LEConnectionCompleteEvent) *conn {
+func newConn(s cmd.Sender, bufCnt int, param *evt.LEConnectionCompleteEvent) *conn {
 	c := &conn{
-		hci:   h,
-		param: param,
+		sender: s,
+		param:  param,
 
 		rxMTU: 23,
 		txMTU: 23,
@@ -102,7 +104,7 @@ func newConn(h *hci, param *evt.LEConnectionCompleteEvent) *conn {
 		chInPkt: make(chan aclPkt, 16),
 		chInPDU: make(chan pdu, 16),
 
-		chSentBufs: make(chan []byte, h.bufCnt),
+		chSentBufs: make(chan []byte, bufCnt),
 	}
 
 	go func() {
@@ -117,11 +119,6 @@ func newConn(h *hci, param *evt.LEConnectionCompleteEvent) *conn {
 		}
 	}()
 	return c
-}
-
-// Accept returns a L2CAP connections.
-func (h *hci) Accept() (Conn, error) {
-	return <-h.chConn, nil
 }
 
 // Read copies re-assembled L2CAP PDUs into sdu.
@@ -205,8 +202,8 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 	// All L2CAP fragments associated with an L2CAP PDU shall be processed for
 	// transmission by the Controller before any other L2CAP PDU for the same
 	// logical transport shall be processed.
-	c.hci.muACL.Lock()
-	defer c.hci.muACL.Unlock()
+	// c.hci.muACL.Lock()
+	// defer c.hci.muACL.Unlock()
 
 	for len(pdu) > 0 {
 		// Get a buffer from our pre-allocated and flow-controlled pool.

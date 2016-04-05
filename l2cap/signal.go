@@ -1,6 +1,6 @@
 //go:generate sh -c "go run tools/codegen/codegen.go -tmpl signal -in tools/codegen/signal.json -out signal_gen.go && goimports -w signal_gen.go"
 
-package hci
+package l2cap
 
 import (
 	"bytes"
@@ -181,7 +181,7 @@ func (c *conn) handleConnectionParameterUpdateRequest(s sigCmd) {
 	}
 
 	// LE Connection Update (0x08|0x0013) [Vol 2, Part E, 7.8.18]
-	c.hci.Send(&cmd.LEConnectionUpdate{
+	c.sender.Send(&cmd.LEConnectionUpdate{
 		ConnectionHandle:   c.param.ConnectionHandle,
 		ConnIntervalMin:    req.IntervalMin,
 		ConnIntervalMax:    req.IntervalMax,
