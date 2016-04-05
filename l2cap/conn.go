@@ -76,7 +76,7 @@ type conn struct {
 
 	sigSent chan []byte
 
-	chInPkt chan aclPkt
+	chInPkt chan Packet
 	chInPDU chan pdu
 
 	// chSentBufs tracks the HCI buffer occupied by this connection.
@@ -84,9 +84,18 @@ type conn struct {
 
 	// leFrame is set to be true when the LE Credit based flow control is used.
 	leFrame bool
+
+	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
+	bufCnt  int
+	bufSize int // Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
+	chBufs  chan []byte
+
+	addr net.HardwareAddr
 }
 
-func newConn(s cmd.Sender, bufCnt int, param *evt.LEConnectionCompleteEvent) *conn {
+// NewConn returns ...
+func NewConn(s cmd.Sender, bufCnt, bufSize int, chBufs chan []byte, addr net.HardwareAddr,
+	param *evt.LEConnectionCompleteEvent) Conn {
 	c := &conn{
 		sender: s,
 		param:  param,
@@ -100,10 +109,15 @@ func newConn(s cmd.Sender, bufCnt int, param *evt.LEConnectionCompleteEvent) *co
 		sigRxMTU: 512,
 		sigTxMTU: 23,
 
-		chInPkt: make(chan aclPkt, 16),
+		chInPkt: make(chan Packet, 16),
 		chInPDU: make(chan pdu, 16),
 
+		bufCnt:     bufCnt,
+		bufSize:    bufSize,
+		chBufs:     chBufs,
 		chSentBufs: make(chan []byte, bufCnt),
+
+		addr: addr,
 	}
 
 	go func() {
@@ -206,12 +220,12 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 
 	for len(pdu) > 0 {
 		// Get a buffer from our pre-allocated and flow-controlled pool.
-		buf := <-c.hci.chBufs
+		buf := <-c.chBufs
 		pkt := bytes.NewBuffer(buf) // ACL Packet
 		pkt.Reset()
 		flen := len(pdu) // fragment length
-		if flen > c.hci.bufSize {
-			flen = c.hci.bufSize
+		if flen > c.bufSize {
+			flen = c.bufSize
 		}
 
 		// Prepare the Headers
@@ -246,7 +260,7 @@ func (c *conn) recombine() error {
 		return io.EOF
 	}
 
-	p := pdu(pkt.data())
+	p := pdu(pkt.Data())
 
 	// Currently, check for LE-U only. For channels that we don't recognizes,
 	// re-combine them anyway, and discard them later when we dispatch the PDU
@@ -259,13 +273,13 @@ func (c *conn) recombine() error {
 	// fragments, re-allocate the whole PDU (including Header).
 	if len(p.payload()) < p.dlen() {
 		p = make([]byte, 0, 4+p.dlen())
-		p = append(p, pdu(pkt.data())...)
+		p = append(p, pdu(pkt.Data())...)
 	}
 	for len(p) < 4+p.dlen() {
-		if pkt, ok = <-c.chInPkt; !ok || (pkt.pbf()&pbfContinuing) == 0 {
+		if pkt, ok = <-c.chInPkt; !ok || (pkt.PBF()&pbfContinuing) == 0 {
 			return io.ErrUnexpectedEOF
 		}
-		p = append(p, pdu(pkt.data())...)
+		p = append(p, pdu(pkt.Data())...)
 	}
 
 	// TODO: support dynamic or assigned channels for LE-Frames.
@@ -284,12 +298,16 @@ func (c *conn) recombine() error {
 
 // Close disconnects the connection by sending hci disconnect command to the device.
 func (c *conn) Close() error {
+	close(c.chInPkt)
+	for buf := range c.chSentBufs {
+		c.chBufs <- buf
+	}
 	return nil
 }
 
 // LocalAddr returns local device's MAC address.
 func (c *conn) LocalAddr() net.HardwareAddr {
-	return c.hci.addr
+	return c.addr
 }
 
 // RemoteAddr returns remote device's MAC address.
@@ -317,18 +335,27 @@ func (c *conn) Parameters() *evt.LEConnectionCompleteEvent {
 	return c.param
 }
 
-// HCI ACL Data Packet [Vol 2, Part E, 5.4.2]
+// Packet implements HCI ACL Data Packet [Vol 2, Part E, 5.4.2]
 // Packet boundary flags , bit[5:6] of handle field's MSB
 // Broadcast flags. bit[7:8] of handle field's MSB
 // Not used in LE-U. Leave it as 0x00 (Point-to-Point).
 // Broadcasting in LE uses ADVB logical transport.
-type aclPkt []byte
+type Packet []byte
 
-func (a aclPkt) handle() uint16 { return uint16(a[0]) | (uint16(a[1]&0x0f) << 8) }
-func (a aclPkt) pbf() int       { return (int(a[1]) >> 4) & 0x3 }
-func (a aclPkt) bcf() int       { return (int(a[1]) >> 6) & 0x3 }
-func (a aclPkt) dlen() int      { return int(a[2]) | (int(a[3]) << 8) }
-func (a aclPkt) data() []byte   { return a[4:] }
+// Handle ...
+func (a Packet) Handle() uint16 { return uint16(a[0]) | (uint16(a[1]&0x0f) << 8) }
+
+// PBF ...
+func (a Packet) PBF() int { return (int(a[1]) >> 4) & 0x3 }
+
+// BCF ...
+func (a Packet) BCF() int { return (int(a[1]) >> 6) & 0x3 }
+
+// Dlen ...
+func (a Packet) Dlen() int { return int(a[2]) | (int(a[3]) << 8) }
+
+// Data ...
+func (a Packet) Data() []byte { return a[4:] }
 
 type pdu []byte
 

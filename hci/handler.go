@@ -45,9 +45,9 @@ func (d *dispatcher) dispatch(b []byte) {
 }
 
 func (h *hci) handleACLData(b []byte) {
-	a := aclPkt(b)
+	a := l2cap.Packet(b)
 	h.muConns.Lock()
-	c, ok := h.conns[a.handle()]
+	c, ok := h.conns[a.Handle()]
 	h.muConns.Unlock()
 	if !ok {
 		return
@@ -106,7 +106,7 @@ func (h *hci) handleLEConnectionComplete(b []byte) {
 		return
 	}
 
-	c := newConn(h, e)
+	c := l2cap.NewConn(h, h.bufCnt, h.bufSize, h.chBufs, h.addr, e)
 	h.muConns.Lock()
 	h.conns[e.ConnectionHandle] = c
 	h.muConns.Unlock()
@@ -132,10 +132,7 @@ func (h *hci) handleDisconnectionComplete(b []byte) {
 		log.Errorf("conns: disconnecting an invalid handle %04X", e.ConnectionHandle)
 		return
 	}
-	close(c.chInPkt)
-	for buf := range c.chSentBufs {
-		h.chBufs <- buf
-	}
+	c.Close()
 }
 
 func (h *hci) handleNumberOfCompletedPackets(b []byte) {
