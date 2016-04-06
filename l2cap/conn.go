@@ -223,14 +223,11 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 
 	for len(pdu) > 0 {
 		// Get a buffer from our pre-allocated and flow-controlled pool.
-		buf := c.client.Alloc()
-		pkt := bytes.NewBuffer(buf) // ACL Packet
-		pkt.Reset()
-		flen := len(pdu) // fragment length
-		if flen > len(buf)-1-4 {
-			flen = len(buf) - 1 - 4
+		pkt := c.client.Alloc() // ACL Packet
+		flen := len(pdu)        // fragment length
+		if flen > pkt.Cap()-1-4 {
+			flen = pkt.Cap() - 1 - 4
 		}
-		log.Printf("buflen: %d, pdu len: %d, flen: %d", len(buf), len(pdu), flen)
 
 		// Prepare the Headers
 		binary.Write(pkt, binary.LittleEndian, uint8(pktTypeACLData))                       // HCI Header: Packet Type

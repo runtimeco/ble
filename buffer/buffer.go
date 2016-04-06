@@ -1,9 +1,9 @@
 package buffer
 
-import "sync"
-
-// Buffer ...
-type Buffer []byte
+import (
+	"bytes"
+	"sync"
+)
 
 // Pool ...
 type Pool struct {
@@ -11,14 +11,14 @@ type Pool struct {
 
 	size int
 	cnt  int
-	ch   chan Buffer
+	ch   chan *bytes.Buffer
 }
 
 // NewPool ...
 func NewPool(size int, cnt int) *Pool {
-	ch := make(chan Buffer, cnt)
+	ch := make(chan *bytes.Buffer, cnt)
 	for len(ch) < cnt {
-		ch <- make([]byte, size)
+		ch <- bytes.NewBuffer(make([]byte, size))
 	}
 	return &Pool{size: size, cnt: cnt, ch: ch}
 }
@@ -26,12 +26,12 @@ func NewPool(size int, cnt int) *Pool {
 // Client ...
 type Client struct {
 	p    *Pool
-	used chan Buffer
+	used chan *bytes.Buffer
 }
 
 // NewClient ...
 func NewClient(p *Pool) *Client {
-	return &Client{p: p, used: make(chan Buffer, p.cnt)}
+	return &Client{p: p, used: make(chan *bytes.Buffer, p.cnt)}
 }
 
 // Lock ...
@@ -41,8 +41,9 @@ func (c *Client) Lock() { c.p.Lock() }
 func (c *Client) Unlock() { c.p.Unlock() }
 
 // Alloc ...
-func (c *Client) Alloc() Buffer {
+func (c *Client) Alloc() *bytes.Buffer {
 	b := <-c.p.ch
+	b.Reset()
 	c.used <- b
 	return b
 }
