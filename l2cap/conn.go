@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/currantlabs/bt/buffer"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 )
@@ -34,6 +35,8 @@ type Conn interface {
 
 	// SetRxMTU sets the MTU which the upper layer of remote device is capable of accepting.
 	SetTxMTU(mtu int)
+
+	TxBuffers() *buffer.Client
 
 	Parameters() *evt.LEConnectionCompleteEvent
 }
@@ -79,22 +82,18 @@ type conn struct {
 	chInPkt chan Packet
 	chInPDU chan pdu
 
-	// chSentBufs tracks the HCI buffer occupied by this connection.
-	chSentBufs chan []byte
-
 	// leFrame is set to be true when the LE Credit based flow control is used.
 	leFrame bool
 
 	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
-	bufCnt  int
-	bufSize int // Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
-	chBufs  chan []byte
+	// chSentBufs tracks the HCI buffer occupied by this connection.
+	client *buffer.Client
 
 	addr net.HardwareAddr
 }
 
 // NewConn returns ...
-func NewConn(s cmd.Sender, bufCnt, bufSize int, chBufs chan []byte, addr net.HardwareAddr,
+func NewConn(s cmd.Sender, client *buffer.Client, addr net.HardwareAddr,
 	param *evt.LEConnectionCompleteEvent) Conn {
 	c := &conn{
 		sender: s,
@@ -112,12 +111,8 @@ func NewConn(s cmd.Sender, bufCnt, bufSize int, chBufs chan []byte, addr net.Har
 		chInPkt: make(chan Packet, 16),
 		chInPDU: make(chan pdu, 16),
 
-		bufCnt:     bufCnt,
-		bufSize:    bufSize,
-		chBufs:     chBufs,
-		chSentBufs: make(chan []byte, bufCnt),
-
-		addr: addr,
+		client: client,
+		addr:   addr,
 	}
 
 	go func() {
@@ -215,17 +210,16 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 	// All L2CAP fragments associated with an L2CAP PDU shall be processed for
 	// transmission by the Controller before any other L2CAP PDU for the same
 	// logical transport shall be processed.
-	// c.hci.muACL.Lock()
-	// defer c.hci.muACL.Unlock()
+	c.client.Lock()
+	defer c.client.Unlock()
 
 	for len(pdu) > 0 {
 		// Get a buffer from our pre-allocated and flow-controlled pool.
-		buf := <-c.chBufs
+		buf := c.client.Alloc()
 		pkt := bytes.NewBuffer(buf) // ACL Packet
-		pkt.Reset()
-		flen := len(pdu) // fragment length
-		if flen > c.bufSize {
-			flen = c.bufSize
+		flen := len(pdu)            // fragment length
+		if flen > len(buf)-1-4 {
+			flen = len(buf) - 1 - 4
 		}
 
 		// Prepare the Headers
@@ -234,17 +228,10 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 		binary.Write(pkt, binary.LittleEndian, uint16(flen))                                // ACL Header: data len
 		binary.Write(pkt, binary.LittleEndian, pdu[:flen])                                  // Append payload
 
-		// Add the HCI buffer to the per-connection list. When written buffers are acked by
-		// the controller via NumberOfCompletedPackets event, we'll put them back to the pool.
-		// When a connection disconnects, all the sent packets and weren't acked yet
-		// will be recylecd. [Vol2, Part E 4.1.1]
-		c.chSentBufs <- buf
-
 		// Flush the packet to HCI
-		_, err := c.hci.dev.Write(pkt.Bytes())
-		if err != nil {
-			return sent, err
-		}
+		// if _, err := c.hci.dev.Write(pkt.Bytes()); err != nil {
+		// 	return sent, err
+		// }
 		sent += flen
 
 		flags = (pbfContinuing << 4) // Set "continuing" in the boundary flags for the rest of fragments, if any.
@@ -299,9 +286,7 @@ func (c *conn) recombine() error {
 // Close disconnects the connection by sending hci disconnect command to the device.
 func (c *conn) Close() error {
 	close(c.chInPkt)
-	for buf := range c.chSentBufs {
-		c.chBufs <- buf
-	}
+	c.client.FreeAll()
 	return nil
 }
 
@@ -329,6 +314,10 @@ func (c *conn) SetTxMTU(mtu int) {
 	log.Printf("Set MTU: %d", mtu)
 	c.txMTU = mtu
 	c.txMPS = mtu
+}
+
+func (c *conn) TxBuffers() *buffer.Client {
+	return c.client
 }
 
 func (c *conn) Parameters() *evt.LEConnectionCompleteEvent {

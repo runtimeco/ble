@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/currantlabs/bt/buffer"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/device"
 	"github.com/currantlabs/bt/hci/evt"
@@ -43,9 +44,8 @@ type hci struct {
 	// L2CAP (LE-U logical link) handling
 
 	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
-	bufCnt  int
-	bufSize int // Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
-	chBufs  chan []byte
+	// Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
+	pool *buffer.Pool
 
 	// L2CAP connections
 	muConns *sync.Mutex
@@ -277,8 +277,8 @@ func (h *hci) Init() error {
 		return err
 	}
 	// Assume the buffers are shared between ACL-U and LE-U.
-	h.bufCnt = int(ReadBufferSizeRP.HCTotalNumACLDataPackets)
-	h.bufSize = int(ReadBufferSizeRP.HCACLDataPacketLength)
+	cnt := int(ReadBufferSizeRP.HCTotalNumACLDataPackets)
+	size := int(ReadBufferSizeRP.HCACLDataPacketLength)
 
 	LEReadBufferSizeRP := cmd.LEReadBufferSizeRP{}
 	if err := h.Send(&cmd.LEReadBufferSize{}, &LEReadBufferSizeRP); err != nil {
@@ -287,16 +287,13 @@ func (h *hci) Init() error {
 
 	if LEReadBufferSizeRP.HCTotalNumLEDataPackets != 0 {
 		// Okay, LE-U do have their own buffers.
-		h.bufCnt = int(LEReadBufferSizeRP.HCTotalNumLEDataPackets)
-		h.bufSize = int(LEReadBufferSizeRP.HCLEDataPacketLength)
+		cnt = int(LEReadBufferSizeRP.HCTotalNumLEDataPackets)
+		size = int(LEReadBufferSizeRP.HCLEDataPacketLength)
 	}
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
-	h.chBufs = make(chan []byte, h.bufCnt)
-	for len(h.chBufs) < h.bufCnt {
-		// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
-		h.chBufs <- make([]byte, 1+4+h.bufSize)
-	}
+	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
+	h.pool = buffer.NewPool(1+4+size, cnt)
 
 	LEReadLocalSupportedFeaturesRP := cmd.LEReadLocalSupportedFeaturesRP{}
 	if err := h.Send(&cmd.LEReadLocalSupportedFeatures{}, &LEReadLocalSupportedFeaturesRP); err != nil {

@@ -6,6 +6,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/currantlabs/bt/buffer"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 	"github.com/currantlabs/bt/l2cap"
@@ -52,7 +53,8 @@ func (h *hci) handleACLData(b []byte) {
 	if !ok {
 		return
 	}
-	c.chInPkt <- a
+	_ = c
+	// c.chInPkt <- a
 }
 
 func (h *hci) handleCommandComplete(b []byte) {
@@ -106,7 +108,7 @@ func (h *hci) handleLEConnectionComplete(b []byte) {
 		return
 	}
 
-	c := l2cap.NewConn(h, h.bufCnt, h.bufSize, h.chBufs, h.addr, e)
+	c := l2cap.NewConn(h, buffer.NewClient(h.pool), h.addr, e)
 	h.muConns.Lock()
 	h.conns[e.ConnectionHandle] = c
 	h.muConns.Unlock()
@@ -150,9 +152,12 @@ func (h *hci) handleNumberOfCompletedPackets(b []byte) {
 		}
 
 		h.muConns.Unlock()
+		// Add the HCI buffer to the per-connection list. When written buffers are acked by
+		// the controller via NumberOfCompletedPackets event, we'll put them back to the pool.
+		// When a connection disconnects, all the sent packets and weren't acked yet
+		// will be recylecd. [Vol2, Part E 4.1.1]
 		for j := 0; j < int(e.HCNumOfCompletedPackets[i]); j++ {
-			buf := <-c.chSentBufs
-			h.chBufs <- buf
+			c.TxBuffers().Free()
 		}
 	}
 }
