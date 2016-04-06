@@ -76,7 +76,7 @@ func (l *LE) handleLEConnectionComplete(b []byte) {
 		return
 	}
 
-	c := newConn(l, NewClient(l.pool), e)
+	c := newConn(l, e)
 	l.muConns.Lock()
 	l.conns[e.ConnectionHandle] = c
 	l.muConns.Unlock()

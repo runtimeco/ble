@@ -87,7 +87,7 @@ type conn struct {
 	txBuffer *Client
 }
 
-func newConn(l *LE, txBuffer *Client, param *evt.LEConnectionCompleteEvent) *conn {
+func newConn(l *LE, param *evt.LEConnectionCompleteEvent) *conn {
 	c := &conn{
 		l:     l,
 		param: param,
@@ -104,7 +104,7 @@ func newConn(l *LE, txBuffer *Client, param *evt.LEConnectionCompleteEvent) *con
 		chInPkt: make(chan pkt, 16),
 		chInPDU: make(chan pdu, 16),
 
-		txBuffer: txBuffer,
+		txBuffer: NewClient(l.pool),
 	}
 
 	go func() {

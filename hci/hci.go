@@ -2,9 +2,9 @@ package hci
 
 import (
 	"io"
+	"log"
 	"net"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/currantlabs/bt/hci/acl"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/device"
@@ -63,7 +63,7 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 	}
 
 	todo := func(b []byte) {
-		log.Errorf("hci: unhandled (TODO) event packet: [ % X ]", b)
+		log.Printf("hci: unhandled (TODO) event packet: [ % X ]", b)
 	}
 
 	h.evtHanlders = &dispatcher{
@@ -160,15 +160,15 @@ func (h *hci) cmdLoop() {
 		b[2] = byte(c.OpCode() >> 8)
 		b[3] = byte(c.Len())
 		if err := c.Marshal(b[4:]); err != nil {
-			log.Errorf("hci: failed to marshal cmd")
+			log.Printf("hci: failed to marshal cmd")
 			return
 		}
 
 		h.sentCmds[c.OpCode()] = p // TODO: lock
 		if n, err := h.dev.Write(b[:4+c.Len()]); err != nil {
-			log.Errorf("hci: failed to send cmd")
+			log.Printf("hci: failed to send cmd")
 		} else if n != 4+c.Len() {
-			log.Errorf("hci: failed to send whole cmd pkt to hci socket")
+			log.Printf("hci: failed to send whole cmd pkt to hci socket")
 		}
 	}
 }
@@ -194,17 +194,17 @@ func (h *hci) handlePkt(b []byte) {
 	t, b := b[0], b[1:]
 	switch t {
 	case pktTypeCommand:
-		log.Errorf("hci: unmanaged cmd: [ % X ]", b)
+		log.Printf("hci: unmanaged cmd: [ % X ]", b)
 	case pktTypeACLData:
 		h.handleACLData(b)
 	case pktTypeSCOData:
-		log.Errorf("hci: unsupported sco packet: [ % X ]", b)
+		log.Printf("hci: unsupported sco packet: [ % X ]", b)
 	case pktTypeEvent:
 		go h.evtHanlders.dispatch(b)
 	case pktTypeVendor:
-		log.Errorf("hci: unsupported vendor packet: [ % X ]", b)
+		log.Printf("hci: unsupported vendor packet: [ % X ]", b)
 	default:
-		log.Errorf("hci: invalid packet: 0x%02X [ % X ]", t, b)
+		log.Printf("hci: invalid packet: 0x%02X [ % X ]", t, b)
 	}
 }
 

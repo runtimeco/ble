@@ -26,11 +26,6 @@ type Sender interface {
 	Send(Command, CommandRP) error
 }
 
-// Send ...
-func Send(s Sender, c Command, r CommandRP) error {
-	return s.Send(c, r)
-}
-
 func marshal(c Command, b []byte) error {
 	buf := bytes.NewBuffer(b)
 	buf.Reset()

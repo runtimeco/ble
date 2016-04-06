@@ -16,7 +16,7 @@ type Handler interface {
 // If f is a function with the appropriate signature, HandlerFunc(f) is a Handler object that calls f.
 type HandlerFunc func(b []byte)
 
-// Handle handles an event or ACLData packet.
+// Handle handles an event packet.
 func (f HandlerFunc) Handle(b []byte) {
 	f(b)
 }
