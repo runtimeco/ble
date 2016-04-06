@@ -3,22 +3,19 @@ package hci
 import (
 	"io"
 	"net"
-	"sync"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/currantlabs/bt/hci/acl"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/device"
 	"github.com/currantlabs/bt/hci/evt"
-	"github.com/currantlabs/bt/l2cap"
 )
 
 // HCI ...
 type HCI interface {
 	cmd.Sender
-	EventHandler
-
-	// Accept returns L2CAP connection.
-	Accept() (l2cap.Conn, error)
+	evt.Dispatcher
+	acl.DataPacketHandler
 
 	// LocalAddr returns the MAC address of local device.
 	LocalAddr() net.HardwareAddr
@@ -36,25 +33,18 @@ type hci struct {
 	// Host to Controller command flow control [Vol 2, Part E, 4.4]
 	chCmdBufs chan []byte
 
-	// HCI Event handling
+	// HCI event handling.
 	evtHanlders    *dispatcher
 	subevtHandlers *dispatcher
 
-	// L2CAP (LE-U logical link) handling
-
-	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
-	// Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
-	pool *l2cap.Pool
-
-	// L2CAP connections
-	muConns *sync.Mutex
-	conns   map[uint16]l2cap.Conn
-
-	chConn chan l2cap.Conn
-
-	// Device information or status
+	// Device information or status.
 	addr    net.HardwareAddr
 	txPwrLv int
+
+	// ACL data packet handling.
+	bufSize       int
+	bufCnt        int
+	handleACLData func([]byte)
 }
 
 // NewHCI ...
@@ -70,15 +60,6 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 		chCmdPkt:  make(chan *cmdPkt),
 		chCmdBufs: make(chan []byte, 8),
 		sentCmds:  make(map[int]*cmdPkt),
-
-		muConns: &sync.Mutex{},
-		conns:   make(map[uint16]l2cap.Conn),
-
-		chConn: make(chan l2cap.Conn),
-
-		// Currently, we only supports BLE, and the sole user is ATT/GATT.
-		// For BLE, the ATT_MTU has a default (and mandantory minimum) of 23 bytes,
-		// a maximum of 512 bytes.
 	}
 
 	todo := func(b []byte) {
@@ -86,29 +67,24 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 	}
 
 	h.evtHanlders = &dispatcher{
-		handlers: map[int]Handler{
-			evt.DisconnectionCompleteEvent{}.Code():                HandlerFunc(h.handleDisconnectionComplete),
-			evt.EncryptionChangeEvent{}.Code():                     HandlerFunc(todo),
-			evt.ReadRemoteVersionInformationCompleteEvent{}.Code(): HandlerFunc(todo),
-			evt.CommandCompleteEvent{}.Code():                      HandlerFunc(h.handleCommandComplete),
-			evt.CommandStatusEvent{}.Code():                        HandlerFunc(h.handleCommandStatus),
-			evt.HardwareErrorEvent{}.Code():                        HandlerFunc(todo),
-			evt.NumberOfCompletedPacketsEvent{}.Code():             HandlerFunc(h.handleNumberOfCompletedPackets),
-			evt.DataBufferOverflowEvent{}.Code():                   HandlerFunc(todo),
-			evt.EncryptionKeyRefreshCompleteEvent{}.Code():         HandlerFunc(todo),
-			0x3E: HandlerFunc(h.handleLEMeta), // FIMXE: ugliness
-			evt.AuthenticatedPayloadTimeoutExpiredEvent{}.Code(): HandlerFunc(todo),
+		handlers: map[int]evt.Handler{
+			evt.EncryptionChangeEvent{}.Code():                     evt.HandlerFunc(todo),
+			evt.ReadRemoteVersionInformationCompleteEvent{}.Code(): evt.HandlerFunc(todo),
+			evt.CommandCompleteEvent{}.Code():                      evt.HandlerFunc(h.handleCommandComplete),
+			evt.CommandStatusEvent{}.Code():                        evt.HandlerFunc(h.handleCommandStatus),
+			evt.HardwareErrorEvent{}.Code():                        evt.HandlerFunc(todo),
+			evt.DataBufferOverflowEvent{}.Code():                   evt.HandlerFunc(todo),
+			evt.EncryptionKeyRefreshCompleteEvent{}.Code():         evt.HandlerFunc(todo),
+			0x3E: evt.HandlerFunc(h.handleLEMeta), // FIMXE: ugliness
+			evt.AuthenticatedPayloadTimeoutExpiredEvent{}.Code(): evt.HandlerFunc(todo),
 		},
 	}
 
 	h.subevtHandlers = &dispatcher{
-		handlers: map[int]Handler{
-			evt.LEConnectionCompleteEvent{}.SubCode():               HandlerFunc(h.handleLEConnectionComplete),
-			evt.LEAdvertisingReportEvent{}.SubCode():                HandlerFunc(h.handleLEAdvertisingReport),
-			evt.LEConnectionUpdateCompleteEvent{}.SubCode():         HandlerFunc(h.handleLEConnectionUpdateComplete),
-			evt.LEReadRemoteUsedFeaturesCompleteEvent{}.SubCode():   HandlerFunc(todo),
-			evt.LELongTermKeyRequestEvent{}.SubCode():               HandlerFunc(h.handleLELongTermKeyRequest),
-			evt.LERemoteConnectionParameterRequestEvent{}.SubCode(): HandlerFunc(todo),
+		handlers: map[int]evt.Handler{
+			evt.LEAdvertisingReportEvent{}.SubCode():                evt.HandlerFunc(h.handleLEAdvertisingReport),
+			evt.LEReadRemoteUsedFeaturesCompleteEvent{}.SubCode():   evt.HandlerFunc(todo),
+			evt.LERemoteConnectionParameterRequestEvent{}.SubCode(): evt.HandlerFunc(todo),
 		},
 	}
 
@@ -116,47 +92,22 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 	go h.cmdLoop()
 	h.chCmdBufs <- make([]byte, 64)
 
-	h.Init()
-
-	return h, nil
-}
-
-// A Handler handles an HCI event or incoming ACL Data packets.
-type Handler interface {
-	Handle([]byte)
-}
-
-// The HandlerFunc type is an adapter to allow the use of ordinary functions as packet or event handlers.
-// If f is a function with the appropriate signature, HandlerFunc(f) is a Handler object that calls f.
-type HandlerFunc func(b []byte)
-
-// Handle handles an event or ACLData packet.
-func (f HandlerFunc) Handle(b []byte) {
-	f(b)
-}
-
-// EventHandler ...
-type EventHandler interface {
-	// SetEventHandler registers the handler to handle the HCI event, and returns current handler.
-	SetEventHandler(c int, h Handler) Handler
-
-	// SetSubeventHandler registers the handler to handle the HCI subevent, and returns current handler.
-	SetSubeventHandler(c int, h Handler) Handler
+	return h, h.init()
 }
 
 // SetEventHandler registers the handler to handle the hci event, and returns current handler.
-func (h *hci) SetEventHandler(c int, f Handler) Handler {
+func (h *hci) SetEventHandler(c int, f evt.Handler) evt.Handler {
 	return h.evtHanlders.SetHandler(c, f)
 }
 
 // SetSubeventHandler registers the handler to handle the hci subevent, and returns current handler.
-func (h *hci) SetSubeventHandler(c int, f Handler) Handler {
+func (h *hci) SetSubeventHandler(c int, f evt.Handler) evt.Handler {
 	return h.subevtHandlers.SetHandler(c, f)
 }
 
 // LocalAddr ...
 func (h *hci) LocalAddr() net.HardwareAddr {
-	return net.HardwareAddr([]byte{0x01, 0x02, 0x03, 0x04, 0x05})
+	return h.addr
 }
 
 // Close ...
@@ -173,6 +124,26 @@ func (h *hci) Send(c cmd.Command, r cmd.CommandRP) error {
 		return nil
 	}
 	return r.Unmarshal(b)
+}
+
+// BufferInfo ...
+func (h *hci) BufferInfo() (size int, cnt int) {
+	return h.bufSize, h.bufCnt
+}
+
+// SetDataPacketHandler
+func (h *hci) SetDataPacketHandler(f func([]byte)) {
+	h.handleACLData = f
+}
+
+// Write ...
+func (h *hci) Write(p []byte) (int, error) {
+	return h.dev.Write(p)
+}
+
+// Read ...
+func (h *hci) Read(p []byte) (int, error) {
+	return h.dev.Read(p)
 }
 
 type cmdPkt struct {
@@ -237,9 +208,7 @@ func (h *hci) handlePkt(b []byte) {
 	}
 }
 
-// Init ...
-func (h *hci) Init() error {
-
+func (h *hci) init() error {
 	ResetRP := cmd.ResetRP{}
 	if err := h.Send(&cmd.Reset{}, &ResetRP); err != nil {
 		return err
@@ -271,9 +240,10 @@ func (h *hci) Init() error {
 	if err := h.Send(&cmd.ReadBufferSize{}, &ReadBufferSizeRP); err != nil {
 		return err
 	}
+
 	// Assume the buffers are shared between ACL-U and LE-U.
-	cnt := int(ReadBufferSizeRP.HCTotalNumACLDataPackets)
-	size := int(ReadBufferSizeRP.HCACLDataPacketLength)
+	h.bufCnt = int(ReadBufferSizeRP.HCTotalNumACLDataPackets)
+	h.bufSize = int(ReadBufferSizeRP.HCACLDataPacketLength)
 
 	LEReadBufferSizeRP := cmd.LEReadBufferSizeRP{}
 	if err := h.Send(&cmd.LEReadBufferSize{}, &LEReadBufferSizeRP); err != nil {
@@ -282,13 +252,9 @@ func (h *hci) Init() error {
 
 	if LEReadBufferSizeRP.HCTotalNumLEDataPackets != 0 {
 		// Okay, LE-U do have their own buffers.
-		cnt = int(LEReadBufferSizeRP.HCTotalNumLEDataPackets)
-		size = int(LEReadBufferSizeRP.HCLEDataPacketLength)
+		h.bufCnt = int(LEReadBufferSizeRP.HCTotalNumLEDataPackets)
+		h.bufSize = int(LEReadBufferSizeRP.HCLEDataPacketLength)
 	}
-
-	// Pre-allocate buffers with additional head room for lower layer headers.
-	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
-	h.pool = l2cap.NewPool(1+4+size, cnt)
 
 	LEReadLocalSupportedFeaturesRP := cmd.LEReadLocalSupportedFeaturesRP{}
 	if err := h.Send(&cmd.LEReadLocalSupportedFeatures{}, &LEReadLocalSupportedFeaturesRP); err != nil {
@@ -327,9 +293,4 @@ func (h *hci) Init() error {
 	}
 
 	return nil
-}
-
-// Accept returns a L2CAP connections.
-func (h *hci) Accept() (l2cap.Conn, error) {
-	return <-h.chConn, nil
 }

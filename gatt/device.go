@@ -67,6 +67,7 @@ type Device struct {
 	deviceHandler
 
 	hci hci.HCI
+	acl *l2cap.LE
 
 	state State
 
@@ -99,6 +100,7 @@ func NewDevice(opts ...Option) (*Device, error) {
 	}
 
 	d.hci = h
+	d.acl = l2cap.NewL2CAP(h, h, h, h.LocalAddr())
 	d.Option(opts...)
 	return d, nil
 }
@@ -110,7 +112,7 @@ func (d *Device) Init(f func(*Device, State)) error {
 	// Register our own advertising report handler.
 	d.hci.SetSubeventHandler(
 		evt.LEAdvertisingReportEvent{}.SubCode(),
-		hci.HandlerFunc(d.handleLEAdvertisingReport))
+		evt.HandlerFunc(d.handleLEAdvertisingReport))
 	d.state = StatePoweredOn
 	d.StateChanged = f
 	go d.StateChanged(d, d.state)
@@ -246,7 +248,7 @@ func (d *Device) CancelConnection(p *Peripheral) {
 
 func (d *Device) acceptLoop() {
 	for {
-		l2c, err := d.hci.Accept()
+		l2c, err := d.acl.Accept()
 		if err != nil {
 			log.Fatalf("can't accept conn: %s", err)
 		}

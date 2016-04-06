@@ -7,6 +7,29 @@ import (
 	"encoding/binary"
 )
 
+// A Handler handles an HCI event packets.
+type Handler interface {
+	Handle([]byte)
+}
+
+// The HandlerFunc type is an adapter to allow the use of ordinary functions as packet or event handlers.
+// If f is a function with the appropriate signature, HandlerFunc(f) is a Handler object that calls f.
+type HandlerFunc func(b []byte)
+
+// Handle handles an event or ACLData packet.
+func (f HandlerFunc) Handle(b []byte) {
+	f(b)
+}
+
+// Dispatcher ...
+type Dispatcher interface {
+	// SetEventHandler registers the handler to handle the HCI event, and returns current handler.
+	SetEventHandler(c int, h Handler) Handler
+
+	// SetSubeventHandler registers the handler to handle the HCI subevent, and returns current handler.
+	SetSubeventHandler(c int, h Handler) Handler
+}
+
 type event interface {
 	Unmarshal(b []byte) error
 }

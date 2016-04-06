@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 
-	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 )
 
@@ -35,18 +34,13 @@ type Conn interface {
 	// SetRxMTU sets the MTU which the upper layer of remote device is capable of accepting.
 	SetTxMTU(mtu int)
 
-	TxBuffers() *Client
-
 	Parameters() *evt.LEConnectionCompleteEvent
-
-	HandlePacket(p []byte)
-
-	Disconnect()
 }
 
 type conn struct {
-	sender cmd.Sender
-	param  *evt.LEConnectionCompleteEvent
+	l *LE
+
+	param *evt.LEConnectionCompleteEvent
 
 	// Maximum Transmission Unit (MTU) is the maximum size of payload data
 	// which the upper layer entity is capable of accepting. [Vol 3, Part A, 1.4]
@@ -67,7 +61,7 @@ type conn struct {
 	// L2CAP layer entity is capable of accepting.
 	// A L2CAP implementations supporting LE-U should support at least 23 bytes.
 	// Currently, we support 512 bytes, which should be more than sufficient.
-	// The sigTxMTU is discovered via when we sent a signaling packet that is
+	// The sigTxMTU is discovered via when we sent a signaling pkt that is
 	// larger thean the remote device can handle, and get a response of "Command
 	// Reject" indicating "Signaling MTU exceeded" along with the actual
 	// signaling MTU [Vol 3, Part A, 4.1].
@@ -82,27 +76,21 @@ type conn struct {
 
 	sigSent chan []byte
 
-	chInPkt chan Packet
+	chInPkt chan pkt
 	chInPDU chan pdu
 
 	// leFrame is set to be true when the LE Credit based flow control is used.
 	leFrame bool
 
-	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
+	// Host to Controller Data Flow Control pkt-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
 	// chSentBufs tracks the HCI buffer occupied by this connection.
 	txBuffer *Client
-
-	addr net.HardwareAddr
-
-	dev io.Writer
 }
 
-// NewConn returns ...
-func NewConn(s cmd.Sender, dev io.Writer, txBuffer *Client, addr net.HardwareAddr,
-	param *evt.LEConnectionCompleteEvent) Conn {
+func newConn(l *LE, txBuffer *Client, param *evt.LEConnectionCompleteEvent) *conn {
 	c := &conn{
-		sender: s,
-		param:  param,
+		l:     l,
+		param: param,
 
 		rxMTU: 23,
 		txMTU: 23,
@@ -113,13 +101,10 @@ func NewConn(s cmd.Sender, dev io.Writer, txBuffer *Client, addr net.HardwareAdd
 		sigRxMTU: 512,
 		sigTxMTU: 23,
 
-		chInPkt: make(chan Packet, 16),
+		chInPkt: make(chan pkt, 16),
 		chInPDU: make(chan pdu, 16),
 
 		txBuffer: txBuffer,
-		addr:     addr,
-
-		dev: dev,
 	}
 
 	go func() {
@@ -221,20 +206,20 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 
 	for len(pdu) > 0 {
 		// Get a buffer from our pre-allocated and flow-controlled pool.
-		pkt := c.txBuffer.Alloc() // ACL Packet
+		pkt := c.txBuffer.Alloc() // ACL pkt
 		flen := len(pdu)          // fragment length
 		if flen > pkt.Cap()-1-4 {
 			flen = pkt.Cap() - 1 - 4
 		}
 
 		// Prepare the Headers
-		binary.Write(pkt, binary.LittleEndian, uint8(pktTypeACLData))                       // HCI Header: Packet Type
+		binary.Write(pkt, binary.LittleEndian, uint8(pktTypeACLData))                       // HCI Header: pkt Type
 		binary.Write(pkt, binary.LittleEndian, uint16(c.param.ConnectionHandle|(flags<<8))) // ACL Header: handle and flags
 		binary.Write(pkt, binary.LittleEndian, uint16(flen))                                // ACL Header: data len
 		binary.Write(pkt, binary.LittleEndian, pdu[:flen])                                  // Append payload
 
-		// Flush the packet to HCI
-		if _, err := c.dev.Write(pkt.Bytes()); err != nil {
+		// Flush the pkt to HCI
+		if _, err := c.l.acl.Write(pkt.Bytes()); err != nil {
 			return sent, err
 		}
 		sent += flen
@@ -252,7 +237,7 @@ func (c *conn) recombine() error {
 		return io.EOF
 	}
 
-	p := pdu(pkt.Data())
+	p := pdu(pkt.data())
 
 	// Currently, check for LE-U only. For channels that we don't recognizes,
 	// re-combine them anyway, and discard them later when we dispatch the PDU
@@ -261,17 +246,17 @@ func (c *conn) recombine() error {
 		return fmt.Errorf("fragment size (%d) larger than rxMPS (%d)", p.dlen(), c.rxMPS)
 	}
 
-	// If this packet is not a complete PDU, and we'll be receiving more
+	// If this pkt is not a complete PDU, and we'll be receiving more
 	// fragments, re-allocate the whole PDU (including Header).
 	if len(p.payload()) < p.dlen() {
 		p = make([]byte, 0, 4+p.dlen())
-		p = append(p, pdu(pkt.Data())...)
+		p = append(p, pdu(pkt.data())...)
 	}
 	for len(p) < 4+p.dlen() {
-		if pkt, ok = <-c.chInPkt; !ok || (pkt.PBF()&pbfContinuing) == 0 {
+		if pkt, ok = <-c.chInPkt; !ok || (pkt.pbf()&pbfContinuing) == 0 {
 			return io.ErrUnexpectedEOF
 		}
-		p = append(p, pdu(pkt.Data())...)
+		p = append(p, pdu(pkt.data())...)
 	}
 
 	// TODO: support dynamic or assigned channels for LE-Frames.
@@ -295,7 +280,7 @@ func (c *conn) Close() error {
 
 // LocalAddr returns local device's MAC address.
 func (c *conn) LocalAddr() net.HardwareAddr {
-	return c.addr
+	return c.l.addr
 }
 
 // RemoteAddr returns remote device's MAC address.
@@ -319,44 +304,22 @@ func (c *conn) SetTxMTU(mtu int) {
 	c.txMPS = mtu
 }
 
-func (c *conn) TxBuffers() *Client {
-	return c.txBuffer
-}
-
 func (c *conn) Parameters() *evt.LEConnectionCompleteEvent {
 	return c.param
 }
 
-func (c *conn) HandlePacket(p []byte) {
-	c.chInPkt <- p
-}
-
-func (c *conn) Disconnect() {
-	close(c.chInPkt)
-	c.txBuffer.FreeAll()
-}
-
-// Packet implements HCI ACL Data Packet [Vol 2, Part E, 5.4.2]
+// pkt implements HCI ACL Data Packet [Vol 2, Part E, 5.4.2]
 // Packet boundary flags , bit[5:6] of handle field's MSB
 // Broadcast flags. bit[7:8] of handle field's MSB
 // Not used in LE-U. Leave it as 0x00 (Point-to-Point).
 // Broadcasting in LE uses ADVB logical transport.
-type Packet []byte
+type pkt []byte
 
-// Handle ...
-func (a Packet) Handle() uint16 { return uint16(a[0]) | (uint16(a[1]&0x0f) << 8) }
-
-// PBF ...
-func (a Packet) PBF() int { return (int(a[1]) >> 4) & 0x3 }
-
-// BCF ...
-func (a Packet) BCF() int { return (int(a[1]) >> 6) & 0x3 }
-
-// Dlen ...
-func (a Packet) Dlen() int { return int(a[2]) | (int(a[3]) << 8) }
-
-// Data ...
-func (a Packet) Data() []byte { return a[4:] }
+func (a pkt) handle() uint16 { return uint16(a[0]) | (uint16(a[1]&0x0f) << 8) }
+func (a pkt) pbf() int       { return (int(a[1]) >> 4) & 0x3 }
+func (a pkt) bcf() int       { return (int(a[1]) >> 6) & 0x3 }
+func (a pkt) dlen() int      { return int(a[2]) | (int(a[3]) << 8) }
+func (a pkt) data() []byte   { return a[4:] }
 
 type pdu []byte
 
