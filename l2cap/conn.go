@@ -39,6 +39,10 @@ type Conn interface {
 	TxBuffers() *buffer.Client
 
 	Parameters() *evt.LEConnectionCompleteEvent
+
+	HandlePacket(p []byte)
+
+	Disconnect()
 }
 
 type conn struct {
@@ -90,10 +94,12 @@ type conn struct {
 	client *buffer.Client
 
 	addr net.HardwareAddr
+
+	dev io.Writer
 }
 
 // NewConn returns ...
-func NewConn(s cmd.Sender, client *buffer.Client, addr net.HardwareAddr,
+func NewConn(s cmd.Sender, dev io.Writer, client *buffer.Client, addr net.HardwareAddr,
 	param *evt.LEConnectionCompleteEvent) Conn {
 	c := &conn{
 		sender: s,
@@ -113,6 +119,8 @@ func NewConn(s cmd.Sender, client *buffer.Client, addr net.HardwareAddr,
 
 		client: client,
 		addr:   addr,
+
+		dev: dev,
 	}
 
 	go func() {
@@ -217,10 +225,12 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 		// Get a buffer from our pre-allocated and flow-controlled pool.
 		buf := c.client.Alloc()
 		pkt := bytes.NewBuffer(buf) // ACL Packet
-		flen := len(pdu)            // fragment length
+		pkt.Reset()
+		flen := len(pdu) // fragment length
 		if flen > len(buf)-1-4 {
 			flen = len(buf) - 1 - 4
 		}
+		log.Printf("buflen: %d, pdu len: %d, flen: %d", len(buf), len(pdu), flen)
 
 		// Prepare the Headers
 		binary.Write(pkt, binary.LittleEndian, uint8(pktTypeACLData))                       // HCI Header: Packet Type
@@ -229,9 +239,9 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 		binary.Write(pkt, binary.LittleEndian, pdu[:flen])                                  // Append payload
 
 		// Flush the packet to HCI
-		// if _, err := c.hci.dev.Write(pkt.Bytes()); err != nil {
-		// 	return sent, err
-		// }
+		if _, err := c.dev.Write(pkt.Bytes()); err != nil {
+			return sent, err
+		}
 		sent += flen
 
 		flags = (pbfContinuing << 4) // Set "continuing" in the boundary flags for the rest of fragments, if any.
@@ -285,8 +295,6 @@ func (c *conn) recombine() error {
 
 // Close disconnects the connection by sending hci disconnect command to the device.
 func (c *conn) Close() error {
-	close(c.chInPkt)
-	c.client.FreeAll()
 	return nil
 }
 
@@ -322,6 +330,15 @@ func (c *conn) TxBuffers() *buffer.Client {
 
 func (c *conn) Parameters() *evt.LEConnectionCompleteEvent {
 	return c.param
+}
+
+func (c *conn) HandlePacket(p []byte) {
+	c.chInPkt <- p
+}
+
+func (c *conn) Disconnect() {
+	close(c.chInPkt)
+	c.client.FreeAll()
 }
 
 // Packet implements HCI ACL Data Packet [Vol 2, Part E, 5.4.2]

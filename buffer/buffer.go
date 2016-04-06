@@ -44,7 +44,7 @@ func (c *Client) Unlock() { c.p.Unlock() }
 func (c *Client) Alloc() Buffer {
 	b := <-c.p.ch
 	c.used <- b
-	return b[:0]
+	return b
 }
 
 // Free ...

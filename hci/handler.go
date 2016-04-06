@@ -53,8 +53,7 @@ func (h *hci) handleACLData(b []byte) {
 	if !ok {
 		return
 	}
-	_ = c
-	// c.chInPkt <- a
+	c.HandlePacket(a)
 }
 
 func (h *hci) handleCommandComplete(b []byte) {
@@ -108,7 +107,7 @@ func (h *hci) handleLEConnectionComplete(b []byte) {
 		return
 	}
 
-	c := l2cap.NewConn(h, buffer.NewClient(h.pool), h.addr, e)
+	c := l2cap.NewConn(h, h.dev, buffer.NewClient(h.pool), h.addr, e)
 	h.muConns.Lock()
 	h.conns[e.ConnectionHandle] = c
 	h.muConns.Unlock()
@@ -134,7 +133,7 @@ func (h *hci) handleDisconnectionComplete(b []byte) {
 		log.Errorf("conns: disconnecting an invalid handle %04X", e.ConnectionHandle)
 		return
 	}
-	c.Close()
+	c.Disconnect()
 }
 
 func (h *hci) handleNumberOfCompletedPackets(b []byte) {
