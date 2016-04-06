@@ -6,7 +6,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/currantlabs/bt/buffer"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 	"github.com/currantlabs/bt/l2cap"
@@ -107,7 +106,7 @@ func (h *hci) handleLEConnectionComplete(b []byte) {
 		return
 	}
 
-	c := l2cap.NewConn(h, h.dev, buffer.NewClient(h.pool), h.addr, e)
+	c := l2cap.NewConn(h, h.dev, l2cap.NewClient(h.pool), h.addr, e)
 	h.muConns.Lock()
 	h.conns[e.ConnectionHandle] = c
 	h.muConns.Unlock()

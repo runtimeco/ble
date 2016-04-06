@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 
-	"github.com/currantlabs/bt/buffer"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 )
@@ -36,7 +35,7 @@ type Conn interface {
 	// SetRxMTU sets the MTU which the upper layer of remote device is capable of accepting.
 	SetTxMTU(mtu int)
 
-	TxBuffers() *buffer.Client
+	TxBuffers() *Client
 
 	Parameters() *evt.LEConnectionCompleteEvent
 
@@ -91,7 +90,7 @@ type conn struct {
 
 	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
 	// chSentBufs tracks the HCI buffer occupied by this connection.
-	client *buffer.Client
+	txBuffer *Client
 
 	addr net.HardwareAddr
 
@@ -99,7 +98,7 @@ type conn struct {
 }
 
 // NewConn returns ...
-func NewConn(s cmd.Sender, dev io.Writer, client *buffer.Client, addr net.HardwareAddr,
+func NewConn(s cmd.Sender, dev io.Writer, txBuffer *Client, addr net.HardwareAddr,
 	param *evt.LEConnectionCompleteEvent) Conn {
 	c := &conn{
 		sender: s,
@@ -117,8 +116,8 @@ func NewConn(s cmd.Sender, dev io.Writer, client *buffer.Client, addr net.Hardwa
 		chInPkt: make(chan Packet, 16),
 		chInPDU: make(chan pdu, 16),
 
-		client: client,
-		addr:   addr,
+		txBuffer: txBuffer,
+		addr:     addr,
 
 		dev: dev,
 	}
@@ -168,7 +167,6 @@ func (c *conn) Read(sdu []byte) (int, error) {
 
 // Write breaks down a L2CAP SDU into segmants [Vol 3, Part A, 7.3.1]
 func (c *conn) Write(sdu []byte) (int, error) {
-	// log.Printf("Write(): %d [ % X]", len(sdu), sdu)
 	if len(sdu) > c.txMTU {
 		return 0, io.ErrShortWrite
 	}
@@ -218,13 +216,13 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 	// All L2CAP fragments associated with an L2CAP PDU shall be processed for
 	// transmission by the Controller before any other L2CAP PDU for the same
 	// logical transport shall be processed.
-	c.client.Lock()
-	defer c.client.Unlock()
+	c.txBuffer.Lock()
+	defer c.txBuffer.Unlock()
 
 	for len(pdu) > 0 {
 		// Get a buffer from our pre-allocated and flow-controlled pool.
-		pkt := c.client.Alloc() // ACL Packet
-		flen := len(pdu)        // fragment length
+		pkt := c.txBuffer.Alloc() // ACL Packet
+		flen := len(pdu)          // fragment length
 		if flen > pkt.Cap()-1-4 {
 			flen = pkt.Cap() - 1 - 4
 		}
@@ -321,8 +319,8 @@ func (c *conn) SetTxMTU(mtu int) {
 	c.txMPS = mtu
 }
 
-func (c *conn) TxBuffers() *buffer.Client {
-	return c.client
+func (c *conn) TxBuffers() *Client {
+	return c.txBuffer
 }
 
 func (c *conn) Parameters() *evt.LEConnectionCompleteEvent {
@@ -335,7 +333,7 @@ func (c *conn) HandlePacket(p []byte) {
 
 func (c *conn) Disconnect() {
 	close(c.chInPkt)
-	c.client.FreeAll()
+	c.txBuffer.FreeAll()
 }
 
 // Packet implements HCI ACL Data Packet [Vol 2, Part E, 5.4.2]

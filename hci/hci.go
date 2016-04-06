@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/currantlabs/bt/buffer"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/device"
 	"github.com/currantlabs/bt/hci/evt"
@@ -45,7 +44,7 @@ type hci struct {
 
 	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
 	// Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
-	pool *buffer.Pool
+	pool *l2cap.Pool
 
 	// L2CAP connections
 	muConns *sync.Mutex
@@ -293,7 +292,7 @@ func (h *hci) Init() error {
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
-	h.pool = buffer.NewPool(1+4+size, cnt)
+	h.pool = l2cap.NewPool(1+4+size, cnt)
 
 	LEReadLocalSupportedFeaturesRP := cmd.LEReadLocalSupportedFeaturesRP{}
 	if err := h.Send(&cmd.LEReadLocalSupportedFeatures{}, &LEReadLocalSupportedFeaturesRP); err != nil {
