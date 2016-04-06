@@ -50,9 +50,7 @@ type hci struct {
 	muConns *sync.Mutex
 	conns   map[uint16]l2cap.Conn
 
-	muACL  *sync.Mutex
 	chConn chan l2cap.Conn
-	mps    int // Maximum PDU Payload Size (MPS)
 
 	// Device information or status
 	addr    net.HardwareAddr
@@ -76,13 +74,11 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 		muConns: &sync.Mutex{},
 		conns:   make(map[uint16]l2cap.Conn),
 
-		muACL:  &sync.Mutex{},
 		chConn: make(chan l2cap.Conn),
 
 		// Currently, we only supports BLE, and the sole user is ATT/GATT.
 		// For BLE, the ATT_MTU has a default (and mandantory minimum) of 23 bytes,
 		// a maximum of 512 bytes.
-		mps: 512,
 	}
 
 	todo := func(b []byte) {
