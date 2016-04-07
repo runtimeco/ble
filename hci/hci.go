@@ -47,34 +47,19 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 		skt:          skt,
 		cmdSender:    newCmdSender(skt),
 		aclProcessor: newACLProcessor(skt),
+		evtHandler:   newEvtHandler(),
 	}
 
-	todo := func(b []byte) {
-		log.Printf("hci: unhandled (TODO) event packet: [ % X ]", b)
-	}
-
-	h.evtHandler = &evtHandler{
-		evth: map[int]Handler{
-			evt.EncryptionChangeEvent{}.Code():                     HandlerFunc(todo),
-			evt.ReadRemoteVersionInformationCompleteEvent{}.Code(): HandlerFunc(todo),
-			evt.CommandCompleteEvent{}.Code():                      HandlerFunc(h.handleCommandComplete),
-			evt.CommandStatusEvent{}.Code():                        HandlerFunc(h.handleCommandStatus),
-			evt.HardwareErrorEvent{}.Code():                        HandlerFunc(todo),
-			evt.DataBufferOverflowEvent{}.Code():                   HandlerFunc(todo),
-			evt.EncryptionKeyRefreshCompleteEvent{}.Code():         HandlerFunc(todo),
-			0x3E: HandlerFunc(h.handleLEMeta), // FIMXE: ugliness
-			evt.AuthenticatedPayloadTimeoutExpiredEvent{}.Code(): HandlerFunc(todo),
-		},
-		subh: map[int]Handler{
-			evt.LEAdvertisingReportEvent{}.SubCode():                HandlerFunc(h.handleLEAdvertisingReport),
-			evt.LEReadRemoteUsedFeaturesCompleteEvent{}.SubCode():   HandlerFunc(todo),
-			evt.LERemoteConnectionParameterRequestEvent{}.SubCode(): HandlerFunc(todo),
-		},
-	}
-
+	h.SetEventHandler(evt.CommandCompleteEvent{}.Code(), HandlerFunc(h.cmdSender.handleCommandComplete))
+	h.SetEventHandler(evt.CommandStatusEvent{}.Code(), HandlerFunc(h.cmdSender.handleCommandStatus))
+	// evt.LEAdvertisingReportEvent{}.SubCode():                HandlerFunc(h.handleLEAdvertisingReport),
 	go h.loop()
-
 	return h, h.init()
+}
+
+// Send sends a hci Command and returns unserialized return parameter.
+func (h *hci) Send(c Command, r CommandRP) error {
+	return h.cmdSender.send(c, r)
 }
 
 // SetEventHandler registers the handler to handle the hci event, and returns current handler.
@@ -95,11 +80,6 @@ func (h *hci) LocalAddr() net.HardwareAddr {
 // Stop ...
 func (h *hci) Stop() error {
 	return h.skt.Close()
-}
-
-// Send sends a hci Command and returns unserialized return parameter.
-func (h *hci) Send(c Command, r CommandRP) error {
-	return h.cmdSender.send(c, r)
 }
 
 // SetACLProcessor

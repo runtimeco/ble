@@ -1,4 +1,4 @@
-// +build !devel
+// +build !devel, !linux
 
 package skt
 

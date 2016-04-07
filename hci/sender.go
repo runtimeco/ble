@@ -3,6 +3,8 @@ package hci
 import (
 	"io"
 	"log"
+
+	"github.com/currantlabs/bt/hci/evt"
 )
 
 type cmdSender struct {
@@ -62,4 +64,42 @@ func (s *cmdSender) loop() {
 			log.Printf("hci: failed to send whole cmd pkt to hci socket")
 		}
 	}
+}
+
+func (s *cmdSender) handleCommandComplete(b []byte) {
+	var e evt.CommandCompleteEvent
+	if err := e.Unmarshal(b); err != nil {
+		return
+	}
+
+	for i := 0; i < int(e.NumHCICommandPackets); i++ {
+		s.chBufs <- make([]byte, 64)
+	}
+	if e.CommandOpcode == 0x0000 {
+		// NOP command, used for flow control purpose [Vol 2, Part E, 4.4]
+		return
+	}
+	p, found := s.sent[int(e.CommandOpcode)]
+	if !found {
+		log.Printf("event: can't find the cmd for CommandCompleteEP: %v", e)
+		return
+	}
+	p.done <- e.ReturnParameters
+}
+
+func (s *cmdSender) handleCommandStatus(b []byte) {
+	var e evt.CommandStatusEvent
+	if err := e.Unmarshal(b); err != nil {
+		return
+	}
+
+	for i := 0; i < int(e.NumHCICommandPackets); i++ {
+		s.chBufs <- make([]byte, 64)
+	}
+	p, found := s.sent[int(e.CommandOpcode)]
+	if !found {
+		log.Printf("event: can't find the cmd for CommandStatusEP: %v", e)
+		return
+	}
+	close(p.done)
 }

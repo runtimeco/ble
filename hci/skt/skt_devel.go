@@ -1,5 +1,3 @@
-// +build devel
-
 package skt
 
 import (
@@ -8,6 +6,8 @@ import (
 	"sync"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 // IoR used for an ioctl that reads data from the skt driver.
@@ -22,7 +22,7 @@ func ioW(t, nr, size uintptr) uintptr {
 
 // Ioctl simplified ioct call
 func ioctl(fd, op, arg uintptr) error {
-	if _, _, ep := syscall.Syscall(syscall.SYS_IOCTL, fd, op, arg); ep != 0 {
+	if _, _, ep := unix.Syscall(unix.SYS_IOCTL, fd, op, arg); ep != 0 {
 		return syscall.Errno(ep)
 	}
 	return nil
@@ -93,7 +93,7 @@ type skt struct {
 
 // NewSocket ...
 func NewSocket(n int, chk bool) (*skt, error) {
-	fd, err := syscall.Socket(syscall.AF_BLUETOOTH, syscall.SOCK_RAW, syscall.BTPROTO_HCI)
+	fd, err := unix.Socket(unix.AF_BLUETOOTH, unix.SOCK_RAW, unix.BTPROTO_HCI)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func newSocket(fd, n int, chk bool) (*skt, error) {
 	}
 	log.Printf("dev: %s up", name)
 	if err := ioctl(uintptr(fd), hciUpDevice, uintptr(n)); err != nil {
-		if err != syscall.EALREADY {
+		if err != unix.EALREADY {
 			return nil, err
 		}
 		log.Printf("dev: %s reset", name)
@@ -144,14 +144,14 @@ func newSocket(fd, n int, chk bool) (*skt, error) {
 
 	// Attempt to use the linux 3.14 feature, if this fails with EINVAL fall back to raw access
 	// on older kernels.
-	sa := syscall.SockaddrHCI{Dev: n, Channel: syscall.HCI_CHANNEL_USER}
-	if err := syscall.Bind(fd, &sa); err != nil {
-		if err != syscall.EINVAL {
+	sa := unix.SockaddrHCI{Dev: n, Channel: unix.HCI_CHANNEL_USER}
+	if err := unix.Bind(fd, &sa); err != nil {
+		if err != unix.EINVAL {
 			return nil, err
 		}
 		log.Printf("dev: %s can't bind to hci user channel, err: %s.", name, err)
-		sa := syscall.SockaddrHCI{Dev: n, Channel: syscall.HCI_CHANNEL_RAW}
-		if err := syscall.Bind(fd, &sa); err != nil {
+		sa := unix.SockaddrHCI{Dev: n, Channel: unix.HCI_CHANNEL_RAW}
+		if err := unix.Bind(fd, &sa); err != nil {
 			log.Printf("dev: %s can't bind to hci raw channel, err: %s.", name, err)
 			return nil, err
 		}
@@ -168,15 +168,15 @@ func newSocket(fd, n int, chk bool) (*skt, error) {
 func (d *skt) Read(b []byte) (int, error) {
 	d.rmu.Lock()
 	defer d.rmu.Unlock()
-	return syscall.Read(d.fd, b)
+	return unix.Read(d.fd, b)
 }
 
 func (d *skt) Write(b []byte) (int, error) {
 	d.wmu.Lock()
 	defer d.wmu.Unlock()
-	return syscall.Write(d.fd, b)
+	return unix.Write(d.fd, b)
 }
 
 func (d *skt) Close() error {
-	return syscall.Close(d.fd)
+	return unix.Close(d.fd)
 }
