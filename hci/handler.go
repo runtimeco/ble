@@ -10,16 +10,16 @@ import (
 
 type dispatcher struct {
 	sync.Mutex
-	handlers map[int]evt.Handler
+	handlers map[int]Handler
 }
 
-func (d *dispatcher) Handler(c int) evt.Handler {
+func (d *dispatcher) Handler(c int) Handler {
 	d.Lock()
 	defer d.Unlock()
 	return d.handlers[c]
 }
 
-func (d *dispatcher) SetHandler(c int, f evt.Handler) evt.Handler {
+func (d *dispatcher) SetHandler(c int, f Handler) Handler {
 	d.Lock()
 	defer d.Unlock()
 	old := d.handlers[c]

@@ -5,24 +5,19 @@ import (
 	"log"
 	"net"
 
-	"github.com/currantlabs/bt/hci/acl"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 	"github.com/currantlabs/bt/hci/skt"
 )
 
-// HCI ...
-type HCI interface {
-	cmd.Sender
-	evt.Dispatcher
-	acl.DataPacketHandler
-
-	// LocalAddr returns the MAC address of local skt.
-	LocalAddr() net.HardwareAddr
-
-	// Close stop the skt.
-	Close() error
-}
+// HCI Packet types
+const (
+	pktTypeCommand uint8 = 0x01
+	pktTypeACLData uint8 = 0x02
+	pktTypeSCOData uint8 = 0x03
+	pktTypeEvent   uint8 = 0x04
+	pktTypeVendor  uint8 = 0xFF
+)
 
 type hci struct {
 	skt io.ReadWriteCloser
@@ -67,24 +62,24 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 	}
 
 	h.evtHanlders = &dispatcher{
-		handlers: map[int]evt.Handler{
-			evt.EncryptionChangeEvent{}.Code():                     evt.HandlerFunc(todo),
-			evt.ReadRemoteVersionInformationCompleteEvent{}.Code(): evt.HandlerFunc(todo),
-			evt.CommandCompleteEvent{}.Code():                      evt.HandlerFunc(h.handleCommandComplete),
-			evt.CommandStatusEvent{}.Code():                        evt.HandlerFunc(h.handleCommandStatus),
-			evt.HardwareErrorEvent{}.Code():                        evt.HandlerFunc(todo),
-			evt.DataBufferOverflowEvent{}.Code():                   evt.HandlerFunc(todo),
-			evt.EncryptionKeyRefreshCompleteEvent{}.Code():         evt.HandlerFunc(todo),
-			0x3E: evt.HandlerFunc(h.handleLEMeta), // FIMXE: ugliness
-			evt.AuthenticatedPayloadTimeoutExpiredEvent{}.Code(): evt.HandlerFunc(todo),
+		handlers: map[int]Handler{
+			evt.EncryptionChangeEvent{}.Code():                     HandlerFunc(todo),
+			evt.ReadRemoteVersionInformationCompleteEvent{}.Code(): HandlerFunc(todo),
+			evt.CommandCompleteEvent{}.Code():                      HandlerFunc(h.handleCommandComplete),
+			evt.CommandStatusEvent{}.Code():                        HandlerFunc(h.handleCommandStatus),
+			evt.HardwareErrorEvent{}.Code():                        HandlerFunc(todo),
+			evt.DataBufferOverflowEvent{}.Code():                   HandlerFunc(todo),
+			evt.EncryptionKeyRefreshCompleteEvent{}.Code():         HandlerFunc(todo),
+			0x3E: HandlerFunc(h.handleLEMeta), // FIMXE: ugliness
+			evt.AuthenticatedPayloadTimeoutExpiredEvent{}.Code(): HandlerFunc(todo),
 		},
 	}
 
 	h.subevtHandlers = &dispatcher{
-		handlers: map[int]evt.Handler{
-			evt.LEAdvertisingReportEvent{}.SubCode():                evt.HandlerFunc(h.handleLEAdvertisingReport),
-			evt.LEReadRemoteUsedFeaturesCompleteEvent{}.SubCode():   evt.HandlerFunc(todo),
-			evt.LERemoteConnectionParameterRequestEvent{}.SubCode(): evt.HandlerFunc(todo),
+		handlers: map[int]Handler{
+			evt.LEAdvertisingReportEvent{}.SubCode():                HandlerFunc(h.handleLEAdvertisingReport),
+			evt.LEReadRemoteUsedFeaturesCompleteEvent{}.SubCode():   HandlerFunc(todo),
+			evt.LERemoteConnectionParameterRequestEvent{}.SubCode(): HandlerFunc(todo),
 		},
 	}
 
@@ -95,12 +90,12 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 }
 
 // SetEventHandler registers the handler to handle the hci event, and returns current handler.
-func (h *hci) SetEventHandler(c int, f evt.Handler) evt.Handler {
+func (h *hci) SetEventHandler(c int, f Handler) Handler {
 	return h.evtHanlders.SetHandler(c, f)
 }
 
 // SetSubeventHandler registers the handler to handle the hci subevent, and returns current handler.
-func (h *hci) SetSubeventHandler(c int, f evt.Handler) evt.Handler {
+func (h *hci) SetSubeventHandler(c int, f Handler) Handler {
 	return h.subevtHandlers.SetHandler(c, f)
 }
 
@@ -115,7 +110,7 @@ func (h *hci) Close() error {
 }
 
 // Send sends a hci Command and returns unserialized return parameter.
-func (h *hci) Send(c cmd.Command, r cmd.CommandRP) error {
+func (h *hci) Send(c Command, r CommandRP) error {
 	p := &cmdPkt{c, make(chan []byte)}
 	h.chCmdPkt <- p
 	b := <-p.done
@@ -132,7 +127,7 @@ func (h *hci) SetDataPacketHandler(f func([]byte)) (w io.Writer, size int, cnt i
 }
 
 type cmdPkt struct {
-	cmd  cmd.Command
+	cmd  Command
 	done chan []byte
 }
 

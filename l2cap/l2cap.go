@@ -41,12 +41,12 @@ func NewL2CAP(h hci.HCI) *LE {
 	l.pktWriter = w
 	l.pool = NewPool(1+4+size, cnt)
 
-	h.SetEventHandler(evt.DisconnectionCompleteEvent{}.Code(), evt.HandlerFunc(l.handleDisconnectionComplete))
-	h.SetEventHandler(evt.NumberOfCompletedPacketsEvent{}.Code(), evt.HandlerFunc(l.handleNumberOfCompletedPackets))
+	h.SetEventHandler(evt.DisconnectionCompleteEvent{}.Code(), hci.HandlerFunc(l.handleDisconnectionComplete))
+	h.SetEventHandler(evt.NumberOfCompletedPacketsEvent{}.Code(), hci.HandlerFunc(l.handleNumberOfCompletedPackets))
 
-	h.SetSubeventHandler(evt.LEConnectionCompleteEvent{}.SubCode(), evt.HandlerFunc(l.handleLEConnectionComplete))
-	h.SetSubeventHandler(evt.LEConnectionUpdateCompleteEvent{}.SubCode(), evt.HandlerFunc(l.handleLEConnectionUpdateComplete))
-	h.SetSubeventHandler(evt.LELongTermKeyRequestEvent{}.SubCode(), evt.HandlerFunc(l.handleLELongTermKeyRequest))
+	h.SetSubeventHandler(evt.LEConnectionCompleteEvent{}.SubCode(), hci.HandlerFunc(l.handleLEConnectionComplete))
+	h.SetSubeventHandler(evt.LEConnectionUpdateCompleteEvent{}.SubCode(), hci.HandlerFunc(l.handleLEConnectionUpdateComplete))
+	h.SetSubeventHandler(evt.LELongTermKeyRequestEvent{}.SubCode(), hci.HandlerFunc(l.handleLELongTermKeyRequest))
 
 	return l
 }

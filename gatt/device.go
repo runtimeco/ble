@@ -112,7 +112,7 @@ func (d *Device) Init(f func(*Device, State)) error {
 	// Register our own advertising report handler.
 	d.hci.SetSubeventHandler(
 		evt.LEAdvertisingReportEvent{}.SubCode(),
-		evt.HandlerFunc(d.handleLEAdvertisingReport))
+		hci.HandlerFunc(d.handleLEAdvertisingReport))
 	d.state = StatePoweredOn
 	d.StateChanged = f
 	go d.StateChanged(d, d.state)

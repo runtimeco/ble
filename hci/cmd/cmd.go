@@ -8,25 +8,15 @@ import (
 	"io"
 )
 
-// Command ...
-type Command interface {
-	OpCode() int
+type command interface {
 	Len() int
-	Marshal([]byte) error
 }
 
-// CommandRP ...
-type CommandRP interface {
+type commandRP interface {
 	Unmarshal(b []byte) error
 }
 
-// Sender ...
-type Sender interface {
-	// Send sends a HCI Command and returns unserialized return parameter.
-	Send(Command, CommandRP) error
-}
-
-func marshal(c Command, b []byte) error {
+func marshal(c command, b []byte) error {
 	buf := bytes.NewBuffer(b)
 	buf.Reset()
 	if buf.Cap() < c.Len() {
@@ -35,7 +25,7 @@ func marshal(c Command, b []byte) error {
 	return binary.Write(buf, binary.LittleEndian, c)
 }
 
-func unmarshal(c CommandRP, b []byte) error {
+func unmarshal(c commandRP, b []byte) error {
 	buf := bytes.NewBuffer(b)
 	return binary.Read(buf, binary.LittleEndian, c)
 }
