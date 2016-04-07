@@ -52,7 +52,6 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 
 	h.SetEventHandler(evt.CommandCompleteEvent{}.Code(), HandlerFunc(h.cmdSender.handleCommandComplete))
 	h.SetEventHandler(evt.CommandStatusEvent{}.Code(), HandlerFunc(h.cmdSender.handleCommandStatus))
-	// evt.LEAdvertisingReportEvent{}.SubCode():                HandlerFunc(h.handleLEAdvertisingReport),
 	go h.loop()
 	return h, h.init()
 }
