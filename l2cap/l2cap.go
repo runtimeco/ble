@@ -1,6 +1,7 @@
 package l2cap
 
 import (
+	"io"
 	"log"
 	"sync"
 
@@ -11,7 +12,8 @@ import (
 
 // LE implements L2CAP (LE-U logical link) handling
 type LE struct {
-	hci hci.HCI
+	hci       hci.HCI
+	pktWriter io.Writer
 
 	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
 	// Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
@@ -35,10 +37,9 @@ func NewL2CAP(h hci.HCI) *LE {
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
-	size, cnt := h.BufferInfo()
+	w, size, cnt := h.SetDataPacketHandler(l.handleDataPacket)
+	l.pktWriter = w
 	l.pool = NewPool(1+4+size, cnt)
-
-	h.SetDataPacketHandler(l.handleDataPacket)
 
 	h.SetEventHandler(evt.DisconnectionCompleteEvent{}.Code(), evt.HandlerFunc(l.handleDisconnectionComplete))
 	h.SetEventHandler(evt.NumberOfCompletedPacketsEvent{}.Code(), evt.HandlerFunc(l.handleNumberOfCompletedPackets))

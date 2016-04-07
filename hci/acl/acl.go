@@ -4,8 +4,5 @@ import "io"
 
 // DataPacketHandler ...
 type DataPacketHandler interface {
-	io.ReadWriter
-
-	BufferInfo() (size int, cnt int)
-	SetDataPacketHandler(func([]byte))
+	SetDataPacketHandler(func([]byte)) (w io.Writer, size int, cnt int)
 }

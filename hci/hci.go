@@ -125,24 +125,10 @@ func (h *hci) Send(c cmd.Command, r cmd.CommandRP) error {
 	return r.Unmarshal(b)
 }
 
-// BufferInfo ...
-func (h *hci) BufferInfo() (size int, cnt int) {
-	return h.bufSize, h.bufCnt
-}
-
 // SetDataPacketHandler
-func (h *hci) SetDataPacketHandler(f func([]byte)) {
+func (h *hci) SetDataPacketHandler(f func([]byte)) (w io.Writer, size int, cnt int) {
 	h.handleACLData = f
-}
-
-// Write ...
-func (h *hci) Write(p []byte) (int, error) {
-	return h.skt.Write(p)
-}
-
-// Read ...
-func (h *hci) Read(p []byte) (int, error) {
-	return h.skt.Read(p)
+	return h.skt, h.bufSize, h.bufCnt
 }
 
 type cmdPkt struct {

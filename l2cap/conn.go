@@ -219,7 +219,7 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 		binary.Write(pkt, binary.LittleEndian, pdu[:flen])                                  // Append payload
 
 		// Flush the pkt to HCI
-		if _, err := c.l.hci.Write(pkt.Bytes()); err != nil {
+		if _, err := c.l.pktWriter.Write(pkt.Bytes()); err != nil {
 			return sent, err
 		}
 		sent += flen
