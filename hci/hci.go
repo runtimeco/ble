@@ -7,8 +7,8 @@ import (
 
 	"github.com/currantlabs/bt/hci/acl"
 	"github.com/currantlabs/bt/hci/cmd"
-	"github.com/currantlabs/bt/hci/device"
 	"github.com/currantlabs/bt/hci/evt"
+	"github.com/currantlabs/bt/hci/skt"
 )
 
 // HCI ...
@@ -17,10 +17,10 @@ type HCI interface {
 	evt.Dispatcher
 	acl.DataPacketHandler
 
-	// LocalAddr returns the MAC address of local device.
+	// LocalAddr returns the MAC address of local skt.
 	LocalAddr() net.HardwareAddr
 
-	// Close stop the device.
+	// Close stop the skt.
 	Close() error
 }
 
@@ -49,7 +49,7 @@ type hci struct {
 
 // NewHCI ...
 func NewHCI(devID int, chk bool) (HCI, error) {
-	dev, err := device.NewDevice(devID, chk)
+	dev, err := skt.NewSocket(devID, chk)
 	if err != nil {
 		return nil, err
 	}

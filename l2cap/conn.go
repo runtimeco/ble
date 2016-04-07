@@ -219,7 +219,7 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 		binary.Write(pkt, binary.LittleEndian, pdu[:flen])                                  // Append payload
 
 		// Flush the pkt to HCI
-		if _, err := c.l.acl.Write(pkt.Bytes()); err != nil {
+		if _, err := c.l.hci.Write(pkt.Bytes()); err != nil {
 			return sent, err
 		}
 		sent += flen
@@ -280,7 +280,7 @@ func (c *conn) Close() error {
 
 // LocalAddr returns local device's MAC address.
 func (c *conn) LocalAddr() net.HardwareAddr {
-	return c.l.addr
+	return c.l.hci.LocalAddr()
 }
 
 // RemoteAddr returns remote device's MAC address.

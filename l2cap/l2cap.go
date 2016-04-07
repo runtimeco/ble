@@ -2,19 +2,16 @@ package l2cap
 
 import (
 	"log"
-	"net"
 	"sync"
 
-	"github.com/currantlabs/bt/hci/acl"
+	"github.com/currantlabs/bt/hci"
 	"github.com/currantlabs/bt/hci/cmd"
 	"github.com/currantlabs/bt/hci/evt"
 )
 
 // LE implements L2CAP (LE-U logical link) handling
 type LE struct {
-	sender cmd.Sender
-	addr   net.HardwareAddr
-	acl    acl.DataPacketHandler
+	hci hci.HCI
 
 	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
 	// Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
@@ -27,11 +24,9 @@ type LE struct {
 }
 
 // NewL2CAP ...
-func NewL2CAP(s cmd.Sender, a acl.DataPacketHandler, e evt.Dispatcher, addr net.HardwareAddr) *LE {
+func NewL2CAP(h hci.HCI) *LE {
 	l := &LE{
-		sender: s,
-		acl:    a,
-		addr:   addr,
+		hci: h,
 
 		muConns: &sync.Mutex{},
 		conns:   make(map[uint16]*conn),
@@ -40,17 +35,17 @@ func NewL2CAP(s cmd.Sender, a acl.DataPacketHandler, e evt.Dispatcher, addr net.
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
-	size, cnt := a.BufferInfo()
+	size, cnt := h.BufferInfo()
 	l.pool = NewPool(1+4+size, cnt)
 
-	a.SetDataPacketHandler(l.handleDataPacket)
+	h.SetDataPacketHandler(l.handleDataPacket)
 
-	e.SetEventHandler(evt.DisconnectionCompleteEvent{}.Code(), evt.HandlerFunc(l.handleDisconnectionComplete))
-	e.SetEventHandler(evt.NumberOfCompletedPacketsEvent{}.Code(), evt.HandlerFunc(l.handleNumberOfCompletedPackets))
+	h.SetEventHandler(evt.DisconnectionCompleteEvent{}.Code(), evt.HandlerFunc(l.handleDisconnectionComplete))
+	h.SetEventHandler(evt.NumberOfCompletedPacketsEvent{}.Code(), evt.HandlerFunc(l.handleNumberOfCompletedPackets))
 
-	e.SetSubeventHandler(evt.LEConnectionCompleteEvent{}.SubCode(), evt.HandlerFunc(l.handleLEConnectionComplete))
-	e.SetSubeventHandler(evt.LEConnectionUpdateCompleteEvent{}.SubCode(), evt.HandlerFunc(l.handleLEConnectionUpdateComplete))
-	e.SetSubeventHandler(evt.LELongTermKeyRequestEvent{}.SubCode(), evt.HandlerFunc(l.handleLELongTermKeyRequest))
+	h.SetSubeventHandler(evt.LEConnectionCompleteEvent{}.SubCode(), evt.HandlerFunc(l.handleLEConnectionComplete))
+	h.SetSubeventHandler(evt.LEConnectionUpdateCompleteEvent{}.SubCode(), evt.HandlerFunc(l.handleLEConnectionUpdateComplete))
+	h.SetSubeventHandler(evt.LELongTermKeyRequestEvent{}.SubCode(), evt.HandlerFunc(l.handleLELongTermKeyRequest))
 
 	return l
 }
@@ -137,7 +132,7 @@ func (l *LE) handleLELongTermKeyRequest(b []byte) {
 		return
 	}
 
-	l.sender.Send(&cmd.LELongTermKeyRequestNegativeReply{
+	l.hci.Send(&cmd.LELongTermKeyRequestNegativeReply{
 		ConnectionHandle: e.ConnectionHandle,
 	}, nil)
 }

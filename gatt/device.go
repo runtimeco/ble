@@ -100,7 +100,7 @@ func NewDevice(opts ...Option) (*Device, error) {
 	}
 
 	d.hci = h
-	d.acl = l2cap.NewL2CAP(h, h, h, h.LocalAddr())
+	d.acl = l2cap.NewL2CAP(h)
 	d.Option(opts...)
 	return d, nil
 }

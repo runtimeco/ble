@@ -1,6 +1,6 @@
 // +build devel
 
-package device
+package skt
 
 import (
 	"errors"
@@ -10,12 +10,12 @@ import (
 	"unsafe"
 )
 
-// IoR used for an ioctl that reads data from the device driver.
+// IoR used for an ioctl that reads data from the skt driver.
 func ioR(t, nr, size uintptr) uintptr {
 	return (2 << 30) | (t << 8) | nr | (size << 16)
 }
 
-// IoW used for an ioctl that writes data to the device driver.
+// IoW used for an ioctl that writes data to the skt driver.
 func ioW(t, nr, size uintptr) uintptr {
 	return (1 << 30) | (t << 8) | nr | (size << 16)
 }
@@ -82,7 +82,8 @@ type hciDevStats struct {
 	byteRx uint32
 	byteTx uint32
 }
-type device struct {
+
+type skt struct {
 	fd   int
 	dev  int
 	name string
@@ -90,8 +91,8 @@ type device struct {
 	wmu  *sync.Mutex
 }
 
-// NewDevice ...
-func NewDevice(n int, chk bool) (*device, error) {
+// NewSocket ...
+func NewSocket(n int, chk bool) (*skt, error) {
 	fd, err := syscall.Socket(syscall.AF_BLUETOOTH, syscall.SOCK_RAW, syscall.BTPROTO_HCI)
 	if err != nil {
 		return nil, err
@@ -114,7 +115,7 @@ func NewDevice(n int, chk bool) (*device, error) {
 	return nil, errors.New("no supported devices available")
 }
 
-func newSocket(fd, n int, chk bool) (*device, error) {
+func newSocket(fd, n int, chk bool) (*skt, error) {
 	i := hciDevInfo{id: uint16(n)}
 	if err := ioctl(uintptr(fd), hciGetDeviceInfo, uintptr(unsafe.Pointer(&i))); err != nil {
 		return nil, err
@@ -155,7 +156,7 @@ func newSocket(fd, n int, chk bool) (*device, error) {
 			return nil, err
 		}
 	}
-	return &device{
+	return &skt{
 		fd:   fd,
 		dev:  n,
 		name: name,
@@ -164,18 +165,18 @@ func newSocket(fd, n int, chk bool) (*device, error) {
 	}, nil
 }
 
-func (d *device) Read(b []byte) (int, error) {
+func (d *skt) Read(b []byte) (int, error) {
 	d.rmu.Lock()
 	defer d.rmu.Unlock()
 	return syscall.Read(d.fd, b)
 }
 
-func (d *device) Write(b []byte) (int, error) {
+func (d *skt) Write(b []byte) (int, error) {
 	d.wmu.Lock()
 	defer d.wmu.Unlock()
 	return syscall.Write(d.fd, b)
 }
 
-func (d *device) Close() error {
+func (d *skt) Close() error {
 	return syscall.Close(d.fd)
 }
