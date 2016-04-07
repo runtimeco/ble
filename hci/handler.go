@@ -8,33 +8,48 @@ import (
 	"github.com/currantlabs/bt/hci/evt"
 )
 
-type dispatcher struct {
+type evtHandler struct {
 	sync.Mutex
-	handlers map[int]Handler
+	evth map[int]Handler
+	subh map[int]Handler
 }
 
-func (d *dispatcher) Handler(c int) Handler {
+func (d *evtHandler) EventHandler(c int) Handler {
 	d.Lock()
 	defer d.Unlock()
-	return d.handlers[c]
+	return d.evth[c]
 }
 
-func (d *dispatcher) SetHandler(c int, f Handler) Handler {
+func (d *evtHandler) SubeventHandler(c int) Handler {
 	d.Lock()
 	defer d.Unlock()
-	old := d.handlers[c]
-	d.handlers[c] = f
+	return d.evth[c]
+}
+
+func (d *evtHandler) SetEventHandler(c int, f Handler) Handler {
+	d.Lock()
+	defer d.Unlock()
+	old := d.evth[c]
+	d.evth[c] = f
 	return old
 }
 
-func (d *dispatcher) dispatch(b []byte) {
+func (d *evtHandler) SetSubeventHandler(c int, f Handler) Handler {
+	d.Lock()
+	defer d.Unlock()
+	old := d.subh[c]
+	d.subh[c] = f
+	return old
+}
+
+func (d *evtHandler) dispatch(b []byte) {
 	d.Lock()
 	defer d.Unlock()
 	code, plen := int(b[0]), int(b[1])
 	if plen != len(b[2:]) {
 		log.Printf("hci: corrupt event packet: [ % X ]", b)
 	}
-	if f, found := d.handlers[code]; found {
+	if f, found := d.evth[code]; found {
 		go f.Handle(b[2:])
 		return
 	}
@@ -79,7 +94,7 @@ func (h *hci) handleCommandStatus(b []byte) {
 
 func (h *hci) handleLEMeta(b []byte) {
 	code := int(b[0])
-	if f := h.subevtHandlers.Handler(code); f != nil {
+	if f := h.evtHandler.SubeventHandler(code); f != nil {
 		f.Handle(b)
 		return
 	}

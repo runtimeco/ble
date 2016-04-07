@@ -1,6 +1,9 @@
 package gatt
 
-import "github.com/currantlabs/bt/hci/cmd"
+import (
+	"github.com/currantlabs/bt/hci"
+	"github.com/currantlabs/bt/hci/cmd"
+)
 
 // LnxDeviceID specifies which HCI device to use.
 // If n is set to -1, all the available HCI devices will be probed.
@@ -73,7 +76,7 @@ func LnxSetConnectionParameters(c *cmd.LECreateConnection) Option {
 
 // LnxSendHCIRawCommand sends a raw command to the HCI device
 // This option can be used with NewDevice or Option on Linux implementation.
-func LnxSendHCIRawCommand(c cmd.Command, r cmd.CommandRP) Option {
+func LnxSendHCIRawCommand(c hci.Command, r hci.CommandRP) Option {
 	return func(d *Device) error {
 		return d.hci.Send(c, r)
 	}

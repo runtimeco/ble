@@ -29,8 +29,7 @@ type hci struct {
 	chCmdBufs chan []byte
 
 	// HCI event handling.
-	evtHanlders    *dispatcher
-	subevtHandlers *dispatcher
+	evtHandler *evtHandler
 
 	// Device information or status.
 	addr    net.HardwareAddr
@@ -61,8 +60,8 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 		log.Printf("hci: unhandled (TODO) event packet: [ % X ]", b)
 	}
 
-	h.evtHanlders = &dispatcher{
-		handlers: map[int]Handler{
+	h.evtHandler = &evtHandler{
+		evth: map[int]Handler{
 			evt.EncryptionChangeEvent{}.Code():                     HandlerFunc(todo),
 			evt.ReadRemoteVersionInformationCompleteEvent{}.Code(): HandlerFunc(todo),
 			evt.CommandCompleteEvent{}.Code():                      HandlerFunc(h.handleCommandComplete),
@@ -70,13 +69,10 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 			evt.HardwareErrorEvent{}.Code():                        HandlerFunc(todo),
 			evt.DataBufferOverflowEvent{}.Code():                   HandlerFunc(todo),
 			evt.EncryptionKeyRefreshCompleteEvent{}.Code():         HandlerFunc(todo),
-			0x3E: HandlerFunc(h.handleLEMeta), // FIMXE: ugliness
-			evt.AuthenticatedPayloadTimeoutExpiredEvent{}.Code(): HandlerFunc(todo),
+			evt.LEConnectionCompleteEvent{}.Code():                 HandlerFunc(h.handleLEMeta),
+			evt.AuthenticatedPayloadTimeoutExpiredEvent{}.Code():   HandlerFunc(todo),
 		},
-	}
-
-	h.subevtHandlers = &dispatcher{
-		handlers: map[int]Handler{
+		subh: map[int]Handler{
 			evt.LEAdvertisingReportEvent{}.SubCode():                HandlerFunc(h.handleLEAdvertisingReport),
 			evt.LEReadRemoteUsedFeaturesCompleteEvent{}.SubCode():   HandlerFunc(todo),
 			evt.LERemoteConnectionParameterRequestEvent{}.SubCode(): HandlerFunc(todo),
@@ -91,12 +87,12 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 
 // SetEventHandler registers the handler to handle the hci event, and returns current handler.
 func (h *hci) SetEventHandler(c int, f Handler) Handler {
-	return h.evtHanlders.SetHandler(c, f)
+	return h.evtHandler.SetEventHandler(c, f)
 }
 
 // SetSubeventHandler registers the handler to handle the hci subevent, and returns current handler.
 func (h *hci) SetSubeventHandler(c int, f Handler) Handler {
-	return h.subevtHandlers.SetHandler(c, f)
+	return h.evtHandler.SetSubeventHandler(c, f)
 }
 
 // LocalAddr ...
@@ -182,7 +178,7 @@ func (h *hci) handlePkt(b []byte) {
 	case pktTypeSCOData:
 		log.Printf("hci: unsupported sco packet: [ % X ]", b)
 	case pktTypeEvent:
-		go h.evtHanlders.dispatch(b)
+		go h.evtHandler.dispatch(b)
 	case pktTypeVendor:
 		log.Printf("hci: unsupported vendor packet: [ % X ]", b)
 	default:
