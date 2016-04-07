@@ -25,7 +25,7 @@ type HCI interface {
 }
 
 type hci struct {
-	dev io.ReadWriteCloser
+	skt io.ReadWriteCloser
 
 	sentCmds map[int]*cmdPkt
 	chCmdPkt chan *cmdPkt
@@ -49,13 +49,13 @@ type hci struct {
 
 // NewHCI ...
 func NewHCI(devID int, chk bool) (HCI, error) {
-	dev, err := skt.NewSocket(devID, chk)
+	skt, err := skt.NewSocket(devID, chk)
 	if err != nil {
 		return nil, err
 	}
 
 	h := &hci{
-		dev: dev,
+		skt: skt,
 
 		chCmdPkt:  make(chan *cmdPkt),
 		chCmdBufs: make(chan []byte, 8),
@@ -90,7 +90,6 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 
 	go h.mainLoop()
 	go h.cmdLoop()
-	h.chCmdBufs <- make([]byte, 64)
 
 	return h, h.init()
 }
@@ -112,7 +111,7 @@ func (h *hci) LocalAddr() net.HardwareAddr {
 
 // Close ...
 func (h *hci) Close() error {
-	return h.dev.Close()
+	return h.skt.Close()
 }
 
 // Send sends a hci Command and returns unserialized return parameter.
@@ -138,12 +137,12 @@ func (h *hci) SetDataPacketHandler(f func([]byte)) {
 
 // Write ...
 func (h *hci) Write(p []byte) (int, error) {
-	return h.dev.Write(p)
+	return h.skt.Write(p)
 }
 
 // Read ...
 func (h *hci) Read(p []byte) (int, error) {
-	return h.dev.Read(p)
+	return h.skt.Read(p)
 }
 
 type cmdPkt struct {
@@ -152,6 +151,8 @@ type cmdPkt struct {
 }
 
 func (h *hci) cmdLoop() {
+	h.chCmdBufs <- make([]byte, 64)
+
 	for p := range h.chCmdPkt {
 		b := <-h.chCmdBufs
 		c := p.cmd
@@ -165,7 +166,7 @@ func (h *hci) cmdLoop() {
 		}
 
 		h.sentCmds[c.OpCode()] = p // TODO: lock
-		if n, err := h.dev.Write(b[:4+c.Len()]); err != nil {
+		if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
 			log.Printf("hci: failed to send cmd")
 		} else if n != 4+c.Len() {
 			log.Printf("hci: failed to send whole cmd pkt to hci socket")
@@ -176,7 +177,7 @@ func (h *hci) cmdLoop() {
 func (h *hci) mainLoop() {
 	b := make([]byte, 4096)
 	for {
-		n, err := h.dev.Read(b)
+		n, err := h.skt.Read(b)
 		if err != nil {
 			return
 		}

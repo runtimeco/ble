@@ -9,18 +9,18 @@ import (
 type Pool struct {
 	sync.Mutex
 
-	size int
-	cnt  int
-	ch   chan *bytes.Buffer
+	sz  int
+	cnt int
+	ch  chan *bytes.Buffer
 }
 
 // NewPool ...
-func NewPool(size int, cnt int) *Pool {
+func NewPool(sz int, cnt int) *Pool {
 	ch := make(chan *bytes.Buffer, cnt)
 	for len(ch) < cnt {
-		ch <- bytes.NewBuffer(make([]byte, size))
+		ch <- bytes.NewBuffer(make([]byte, sz))
 	}
-	return &Pool{size: size, cnt: cnt, ch: ch}
+	return &Pool{sz: sz, cnt: cnt, ch: ch}
 }
 
 // Client ...
