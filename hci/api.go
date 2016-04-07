@@ -7,15 +7,15 @@ import (
 
 // HCI ...
 type HCI interface {
-	Sender
-	Dispatcher
-	DataPacketHandler
+	CommandSender
+	EventHandler
+	ACLProcessor
 
 	// LocalAddr returns the MAC address of local skt.
 	LocalAddr() net.HardwareAddr
 
-	// Close stop the skt.
-	Close() error
+	// Stop closes the HCI socket.
+	Stop() error
 }
 
 // Command ...
@@ -30,8 +30,8 @@ type CommandRP interface {
 	Unmarshal(b []byte) error
 }
 
-// Sender ...
-type Sender interface {
+// CommandSender ...
+type CommandSender interface {
 	// Send sends a HCI Command and returns unserialized return parameter.
 	Send(Command, CommandRP) error
 }
@@ -50,8 +50,8 @@ func (f HandlerFunc) Handle(b []byte) {
 	f(b)
 }
 
-// Dispatcher ...
-type Dispatcher interface {
+// EventHandler ...
+type EventHandler interface {
 	// SetEventHandler registers the handler to handle the HCI event, and returns current handler.
 	SetEventHandler(c int, h Handler) Handler
 
@@ -59,7 +59,7 @@ type Dispatcher interface {
 	SetSubeventHandler(c int, h Handler) Handler
 }
 
-// DataPacketHandler ...
-type DataPacketHandler interface {
-	SetDataPacketHandler(func([]byte)) (w io.Writer, size int, cnt int)
+// ACLProcessor ...
+type ACLProcessor interface {
+	SetACLProcessor(func([]byte)) (w io.Writer, size int, cnt int)
 }

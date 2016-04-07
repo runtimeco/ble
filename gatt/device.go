@@ -123,7 +123,9 @@ func (d *Device) Init(f func(*Device, State)) error {
 func (d *Device) Stop() error {
 	d.state = StatePoweredOff
 	defer d.StateChanged(d, d.state)
-	return d.hci.Close()
+	return nil
+	// FIXME: rework API
+	// return d.hci.Close()
 }
 
 // AddService add a service to database.

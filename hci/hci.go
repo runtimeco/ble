@@ -22,23 +22,18 @@ const (
 type hci struct {
 	skt io.ReadWriteCloser
 
-	sentCmds map[int]*cmdPkt
-	chCmdPkt chan *cmdPkt
-
-	// Host to Controller command flow control [Vol 2, Part E, 4.4]
-	chCmdBufs chan []byte
+	// HCI command handling
+	cmdSender *cmdSender
 
 	// HCI event handling.
 	evtHandler *evtHandler
 
+	// ACL data packet handling.
+	aclProcessor *aclProcessor
+
 	// Device information or status.
 	addr    net.HardwareAddr
 	txPwrLv int
-
-	// ACL data packet handling.
-	bufSize       int
-	bufCnt        int
-	handleACLData func([]byte)
 }
 
 // NewHCI ...
@@ -49,11 +44,9 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 	}
 
 	h := &hci{
-		skt: skt,
-
-		chCmdPkt:  make(chan *cmdPkt),
-		chCmdBufs: make(chan []byte, 8),
-		sentCmds:  make(map[int]*cmdPkt),
+		skt:          skt,
+		cmdSender:    newCmdSender(skt),
+		aclProcessor: newACLProcessor(skt),
 	}
 
 	todo := func(b []byte) {
@@ -69,8 +62,8 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 			evt.HardwareErrorEvent{}.Code():                        HandlerFunc(todo),
 			evt.DataBufferOverflowEvent{}.Code():                   HandlerFunc(todo),
 			evt.EncryptionKeyRefreshCompleteEvent{}.Code():         HandlerFunc(todo),
-			evt.LEConnectionCompleteEvent{}.Code():                 HandlerFunc(h.handleLEMeta),
-			evt.AuthenticatedPayloadTimeoutExpiredEvent{}.Code():   HandlerFunc(todo),
+			0x3E: HandlerFunc(h.handleLEMeta), // FIMXE: ugliness
+			evt.AuthenticatedPayloadTimeoutExpiredEvent{}.Code(): HandlerFunc(todo),
 		},
 		subh: map[int]Handler{
 			evt.LEAdvertisingReportEvent{}.SubCode():                HandlerFunc(h.handleLEAdvertisingReport),
@@ -79,8 +72,7 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 		},
 	}
 
-	go h.mainLoop()
-	go h.cmdLoop()
+	go h.loop()
 
 	return h, h.init()
 }
@@ -100,58 +92,22 @@ func (h *hci) LocalAddr() net.HardwareAddr {
 	return h.addr
 }
 
-// Close ...
-func (h *hci) Close() error {
+// Stop ...
+func (h *hci) Stop() error {
 	return h.skt.Close()
 }
 
 // Send sends a hci Command and returns unserialized return parameter.
 func (h *hci) Send(c Command, r CommandRP) error {
-	p := &cmdPkt{c, make(chan []byte)}
-	h.chCmdPkt <- p
-	b := <-p.done
-	if r == nil {
-		return nil
-	}
-	return r.Unmarshal(b)
+	return h.cmdSender.send(c, r)
 }
 
-// SetDataPacketHandler
-func (h *hci) SetDataPacketHandler(f func([]byte)) (w io.Writer, size int, cnt int) {
-	h.handleACLData = f
-	return h.skt, h.bufSize, h.bufCnt
+// SetACLProcessor
+func (h *hci) SetACLProcessor(f func([]byte)) (w io.Writer, size int, cnt int) {
+	return h.aclProcessor.setACLProcessor(f)
 }
 
-type cmdPkt struct {
-	cmd  Command
-	done chan []byte
-}
-
-func (h *hci) cmdLoop() {
-	h.chCmdBufs <- make([]byte, 64)
-
-	for p := range h.chCmdPkt {
-		b := <-h.chCmdBufs
-		c := p.cmd
-		b[0] = byte(pktTypeCommand) // HCI header
-		b[1] = byte(c.OpCode())
-		b[2] = byte(c.OpCode() >> 8)
-		b[3] = byte(c.Len())
-		if err := c.Marshal(b[4:]); err != nil {
-			log.Printf("hci: failed to marshal cmd")
-			return
-		}
-
-		h.sentCmds[c.OpCode()] = p // TODO: lock
-		if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
-			log.Printf("hci: failed to send cmd")
-		} else if n != 4+c.Len() {
-			log.Printf("hci: failed to send whole cmd pkt to hci socket")
-		}
-	}
-}
-
-func (h *hci) mainLoop() {
+func (h *hci) loop() {
 	b := make([]byte, 4096)
 	for {
 		n, err := h.skt.Read(b)
@@ -174,11 +130,11 @@ func (h *hci) handlePkt(b []byte) {
 	case pktTypeCommand:
 		log.Printf("hci: unmanaged cmd: [ % X ]", b)
 	case pktTypeACLData:
-		h.handleACLData(b)
+		h.aclProcessor.handleACLData(b)
 	case pktTypeSCOData:
 		log.Printf("hci: unsupported sco packet: [ % X ]", b)
 	case pktTypeEvent:
-		go h.evtHandler.dispatch(b)
+		go h.evtHandler.handle(b)
 	case pktTypeVendor:
 		log.Printf("hci: unsupported vendor packet: [ % X ]", b)
 	default:
@@ -220,8 +176,9 @@ func (h *hci) init() error {
 	}
 
 	// Assume the buffers are shared between ACL-U and LE-U.
-	h.bufCnt = int(ReadBufferSizeRP.HCTotalNumACLDataPackets)
-	h.bufSize = int(ReadBufferSizeRP.HCACLDataPacketLength)
+	ap := h.aclProcessor
+	ap.bufCnt = int(ReadBufferSizeRP.HCTotalNumACLDataPackets)
+	ap.bufSize = int(ReadBufferSizeRP.HCACLDataPacketLength)
 
 	LEReadBufferSizeRP := cmd.LEReadBufferSizeRP{}
 	if err := h.Send(&cmd.LEReadBufferSize{}, &LEReadBufferSizeRP); err != nil {
@@ -230,8 +187,8 @@ func (h *hci) init() error {
 
 	if LEReadBufferSizeRP.HCTotalNumLEDataPackets != 0 {
 		// Okay, LE-U do have their own buffers.
-		h.bufCnt = int(LEReadBufferSizeRP.HCTotalNumLEDataPackets)
-		h.bufSize = int(LEReadBufferSizeRP.HCLEDataPacketLength)
+		ap.bufCnt = int(LEReadBufferSizeRP.HCTotalNumLEDataPackets)
+		ap.bufSize = int(LEReadBufferSizeRP.HCLEDataPacketLength)
 	}
 
 	LEReadLocalSupportedFeaturesRP := cmd.LEReadLocalSupportedFeaturesRP{}

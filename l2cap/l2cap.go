@@ -37,7 +37,7 @@ func NewL2CAP(h hci.HCI) *LE {
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
-	w, size, cnt := h.SetDataPacketHandler(l.handleDataPacket)
+	w, size, cnt := h.SetACLProcessor(l.handlePacket)
 	l.pktWriter = w
 	l.pool = NewPool(1+4+size, cnt)
 
@@ -51,7 +51,7 @@ func NewL2CAP(h hci.HCI) *LE {
 	return l
 }
 
-func (l *LE) handleDataPacket(b []byte) {
+func (l *LE) handlePacket(b []byte) {
 	l.muConns.Lock()
 	c, ok := l.conns[pkt(b).handle()]
 	l.muConns.Unlock()

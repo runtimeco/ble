@@ -20,18 +20,18 @@ func (d *evtHandler) EventHandler(c int) Handler {
 	return d.evth[c]
 }
 
-func (d *evtHandler) SubeventHandler(c int) Handler {
-	d.Lock()
-	defer d.Unlock()
-	return d.evth[c]
-}
-
 func (d *evtHandler) SetEventHandler(c int, f Handler) Handler {
 	d.Lock()
 	defer d.Unlock()
 	old := d.evth[c]
 	d.evth[c] = f
 	return old
+}
+
+func (d *evtHandler) SubeventHandler(c int) Handler {
+	d.Lock()
+	defer d.Unlock()
+	return d.subh[c]
 }
 
 func (d *evtHandler) SetSubeventHandler(c int, f Handler) Handler {
@@ -42,7 +42,7 @@ func (d *evtHandler) SetSubeventHandler(c int, f Handler) Handler {
 	return old
 }
 
-func (d *evtHandler) dispatch(b []byte) {
+func (d *evtHandler) handle(b []byte) {
 	d.Lock()
 	defer d.Unlock()
 	code, plen := int(b[0]), int(b[1])
@@ -61,14 +61,16 @@ func (h *hci) handleCommandComplete(b []byte) {
 	if err := e.Unmarshal(b); err != nil {
 		return
 	}
+
+	s := h.cmdSender
 	for i := 0; i < int(e.NumHCICommandPackets); i++ {
-		h.chCmdBufs <- make([]byte, 64)
+		s.chBufs <- make([]byte, 64)
 	}
 	if e.CommandOpcode == 0x0000 {
 		// NOP command, used for flow control purpose [Vol 2, Part E, 4.4]
 		return
 	}
-	p, found := h.sentCmds[int(e.CommandOpcode)]
+	p, found := s.sent[int(e.CommandOpcode)]
 	if !found {
 		log.Printf("event: can't find the cmd for CommandCompleteEP: %v", e)
 		return
@@ -81,10 +83,12 @@ func (h *hci) handleCommandStatus(b []byte) {
 	if err := e.Unmarshal(b); err != nil {
 		return
 	}
+
+	s := h.cmdSender
 	for i := 0; i < int(e.NumHCICommandPackets); i++ {
-		h.chCmdBufs <- make([]byte, 64)
+		s.chBufs <- make([]byte, 64)
 	}
-	p, found := h.sentCmds[int(e.CommandOpcode)]
+	p, found := s.sent[int(e.CommandOpcode)]
 	if !found {
 		log.Printf("event: can't find the cmd for CommandStatusEP: %v", e)
 		return

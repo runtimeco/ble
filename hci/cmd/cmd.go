@@ -9,7 +9,9 @@ import (
 )
 
 type command interface {
+	OpCode() int
 	Len() int
+	Marshal([]byte) error
 }
 
 type commandRP interface {
