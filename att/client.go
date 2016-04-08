@@ -1,5 +1,3 @@
-//go:generate sh -c "go run ../tools/codegen/codegen.go -tmpl att -in ../tools/codegen/att.json -out att_gen.go && goimports -w att_gen.go"
-
 package att
 
 import (

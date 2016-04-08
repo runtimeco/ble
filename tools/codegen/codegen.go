@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	in   = flag.String("in", "", "help message for flagname")
 	out  = flag.String("out", "", "help message for flagname")
 	tmpl = flag.String("tmpl", "", "help message for flagname")
 )
@@ -205,38 +204,35 @@ func genAtt(b []byte, w io.Writer, t *template.Template) {
 
 func main() {
 	flag.Parse()
-	if len(*out) == 0 || len(*in) == 0 || len(*tmpl) == 0 {
-		return
-	}
 
-	b := input(*in)
+	b := input(*tmpl + ".json")
 	w := output(*out)
 
 	switch *tmpl {
 	case "cmd":
 		fmt.Fprintf(w, "package %s\n", *tmpl)
-		t, err := template.New(*tmpl).Funcs(funcMap).Parse(string(input("../tools/codegen/" + *tmpl + ".tmpl")))
+		t, err := template.New(*tmpl).Funcs(funcMap).Parse(string(input("cmd.tmpl")))
 		if err != nil {
 			log.Fatalf("parsing: %s", err)
 		}
 		genCmd(b, w, t)
 	case "evt":
 		fmt.Fprintf(w, "package %s\n", *tmpl)
-		t, err := template.New(*tmpl).Funcs(funcMap).Parse(string(input("../tools/codegen/" + *tmpl + ".tmpl")))
+		t, err := template.New(*tmpl).Funcs(funcMap).Parse(string(input("evt.tmpl")))
 		if err != nil {
 			log.Fatalf("parsing: %s", err)
 		}
 		genEvt(b, w, t)
 	case "signal":
-		fmt.Fprintf(w, "package bt\n")
-		t, err := template.New(*tmpl).Funcs(funcMap).Parse(string(input("tools/codegen/signal.tmpl")))
+		fmt.Fprintf(w, "package l2cap\n")
+		t, err := template.New(*tmpl).Funcs(funcMap).Parse(string(input("signal.tmpl")))
 		if err != nil {
 			log.Fatalf("parsing: %s", err)
 		}
 		genSignal(b, w, t)
 	case "att":
 		fmt.Fprintf(w, "package att\n")
-		t, err := template.New(*tmpl).Funcs(funcMap).Parse(string(input("../tools/codegen/att.tmpl")))
+		t, err := template.New(*tmpl).Funcs(funcMap).Parse(string(input("att.tmpl")))
 		if err != nil {
 			log.Fatalf("parsing: %s", err)
 		}

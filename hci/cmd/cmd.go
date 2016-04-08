@@ -1,5 +1,3 @@
-//go:generate sh -c "go run ../tools/codegen/codegen.go -tmpl cmd -in ../tools/codegen/cmd.json -out cmd_gen.go && goimports -w cmd_gen.go"
-
 package cmd
 
 import (

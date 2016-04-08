@@ -1,5 +1,3 @@
-//go:generate sh -c "go run ../tools/codegen/codegen.go -tmpl evt -in ../tools/codegen/evt.json -out evt_gen.go && goimports -w evt_gen.go"
-
 package evt
 
 import (

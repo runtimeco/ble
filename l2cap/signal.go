@@ -1,5 +1,3 @@
-//go:generate sh -c "go run tools/codegen/codegen.go -tmpl signal -in tools/codegen/signal.json -out signal_gen.go && goimports -w signal_gen.go"
-
 package l2cap
 
 import (
