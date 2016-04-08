@@ -133,8 +133,8 @@ func onPeriphConnected(p *gatt.Peripheral, err error) {
 		fmt.Println()
 	}
 
-	fmt.Printf("Waiting for 5 seconds to get some notifiations, if any.\n")
-	time.Sleep(5 * time.Second)
+	fmt.Printf("Waiting for 2 seconds to get some notifiations, if any.\n")
+	time.Sleep(2 * time.Second)
 	p.ClearHandlers()
 }
 

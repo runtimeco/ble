@@ -10,8 +10,8 @@ import (
 
 type cmdSender struct {
 	skt   io.Writer
-	sent  map[int]*cmdPkt
-	chPkt chan *cmdPkt
+	sent  map[int]*pkt
+	chPkt chan *pkt
 
 	// Host to Controller command flow control [Vol 2, Part E, 4.4]
 	chBufs chan []byte
@@ -20,21 +20,21 @@ type cmdSender struct {
 func newCmdSender(skt io.Writer) *cmdSender {
 	s := &cmdSender{
 		skt:    skt,
-		chPkt:  make(chan *cmdPkt),
+		chPkt:  make(chan *pkt),
 		chBufs: make(chan []byte, 8),
-		sent:   make(map[int]*cmdPkt),
+		sent:   make(map[int]*pkt),
 	}
 	go s.loop()
 	return s
 }
 
-type cmdPkt struct {
+type pkt struct {
 	cmd  Command
 	done chan []byte
 }
 
 func (s *cmdSender) send(c Command, r CommandRP) error {
-	p := &cmdPkt{c, make(chan []byte)}
+	p := &pkt{c, make(chan []byte)}
 	s.chPkt <- p
 	b := <-p.done
 	if r == nil {
@@ -98,6 +98,7 @@ func (s *cmdSender) handleCommandStatus(b []byte) error {
 	for i := 0; i < int(e.NumHCICommandPackets); i++ {
 		s.chBufs <- make([]byte, 64)
 	}
+
 	p, found := s.sent[int(e.CommandOpcode)]
 	if !found {
 		return fmt.Errorf("hci: can't find the cmd for CommandStatusEP: %v", e)

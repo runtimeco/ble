@@ -111,9 +111,9 @@ func (l *LE) handleNumberOfCompletedPackets(b []byte) error {
 	l.muConns.Lock()
 	defer l.muConns.Unlock()
 	for i := 0; i < int(e.NumberOfHandles); i++ {
-		c, ok := l.conns[e.ConnectionHandle[i]]
-		if !ok {
-			return fmt.Errorf("l2cap: completed packets for non-existing connection")
+		c, found := l.conns[e.ConnectionHandle[i]]
+		if !found {
+			continue
 		}
 
 		// Add the HCI buffer to the per-connection list. When written buffers are acked by

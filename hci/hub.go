@@ -67,15 +67,12 @@ func (h *evtHub) SetSubeventHandler(c int, f Handler) Handler {
 }
 
 func (h *evtHub) handle(b []byte) error {
-	h.Lock()
-	defer h.Unlock()
 	code, plen := int(b[0]), int(b[1])
 	if plen != len(b[2:]) {
 		return fmt.Errorf("hci: corrupt event packet: [ % X ]", b)
 	}
-	if f, found := h.evth[code]; found {
-		go f.Handle(b[2:])
-		return nil
+	if f := h.EventHandler(code); f != nil {
+		return f.Handle(b[2:])
 	}
 	return fmt.Errorf("hci: unsupported event packet: [ % X ]", b)
 }
