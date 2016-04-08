@@ -51,14 +51,15 @@ func NewL2CAP(h hci.HCI) *LE {
 	return l
 }
 
-func (l *LE) handlePacket(b []byte) {
+func (l *LE) handlePacket(b []byte) error {
 	l.muConns.Lock()
 	c, ok := l.conns[pkt(b).handle()]
 	l.muConns.Unlock()
 	if !ok {
-		return
+		return fmt.Errorf("l2cap: incoming packet for non-existing connection")
 	}
 	c.chInPkt <- b
+	return nil
 }
 
 // Accept returns a L2CAP connections.

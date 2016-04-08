@@ -1,8 +1,8 @@
 package hci
 
 import (
+	"fmt"
 	"io"
-	"log"
 	"net"
 
 	"github.com/currantlabs/bt/hci/cmd"
@@ -20,15 +20,9 @@ const (
 )
 
 type hci struct {
-	skt io.ReadWriteCloser
-
-	// HCI command handling
-	cmdSender *cmdSender
-
-	// HCI event handling.
-	evtHub *evtHub
-
-	// ACL data packet handling.
+	skt          io.ReadWriteCloser
+	cmdSender    *cmdSender
+	evtHub       *evtHub
 	aclProcessor *aclProcessor
 
 	// Device information or status.
@@ -56,35 +50,19 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 	return h, h.init()
 }
 
-// Send sends a hci Command and returns unserialized return parameter.
-func (h *hci) Send(c Command, r CommandRP) error {
-	return h.cmdSender.send(c, r)
-}
+func (h *hci) Send(c Command, r CommandRP) error { return h.cmdSender.send(c, r) }
 
-// SetEventHandler registers the handler to handle the hci event, and returns current handler.
-func (h *hci) SetEventHandler(c int, f Handler) Handler {
-	return h.evtHub.SetEventHandler(c, f)
-}
+func (h *hci) SetEventHandler(c int, f Handler) Handler { return h.evtHub.SetEventHandler(c, f) }
 
-// SetSubeventHandler registers the handler to handle the hci subevent, and returns current handler.
-func (h *hci) SetSubeventHandler(c int, f Handler) Handler {
-	return h.evtHub.SetSubeventHandler(c, f)
-}
+func (h *hci) SetSubeventHandler(c int, f Handler) Handler { return h.evtHub.SetSubeventHandler(c, f) }
 
-// LocalAddr returns device's MAC address.
-func (h *hci) LocalAddr() net.HardwareAddr {
-	return h.addr
-}
-
-// Stop ...
-func (h *hci) Stop() error {
-	return h.skt.Close()
-}
-
-// SetACLProcessor
 func (h *hci) SetACLProcessor(f func([]byte)) (w io.Writer, size int, cnt int) {
 	return h.aclProcessor.setACLProcessor(f)
 }
+
+func (h *hci) LocalAddr() net.HardwareAddr { return h.addr }
+
+func (h *hci) Stop() error { return h.skt.Close() }
 
 func (h *hci) loop() {
 	b := make([]byte, 4096)
@@ -102,27 +80,22 @@ func (h *hci) loop() {
 	}
 }
 
-func (h *hci) handlePkt(b []byte) {
+func (h *hci) handlePkt(b []byte) error {
 	// Strip the HCI header, and pass down the rest of the packet.
 	t, b := b[0], b[1:]
 	switch t {
 	case pktTypeCommand:
-		log.Printf("hci: unmanaged cmd: [ % X ]", b)
+		fmt.Errorf("hci: unmanaged cmd: [ % X ]", b)
 	case pktTypeACLData:
-		h.aclProcessor.handleACLData(b)
+		return h.aclProcessor.handleACLData(b)
 	case pktTypeSCOData:
-		log.Printf("hci: unsupported sco packet: [ % X ]", b)
+		fmt.Errorf("hci: unsupported sco packet: [ % X ]", b)
 	case pktTypeEvent:
-		go func() {
-			err := h.evtHub.handle(b)
-			if err != nil {
-				log.Printf("hci: event error :%s", err)
-			}
-		}()
+		return h.evtHub.handle(b)
 	case pktTypeVendor:
-		log.Printf("hci: unsupported vendor packet: [ % X ]", b)
+		fmt.Errorf("hci: unsupported vendor packet: [ % X ]", b)
 	default:
-		log.Printf("hci: invalid packet: 0x%02X [ % X ]", t, b)
+		fmt.Errorf("hci: invalid packet: 0x%02X [ % X ]", t, b)
 	}
 }
 
