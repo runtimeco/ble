@@ -1,3 +1,5 @@
+// +build linux
+
 package skt
 
 import (
@@ -29,7 +31,7 @@ func ioctl(fd, op, arg uintptr) error {
 }
 
 const (
-	ioctlSize     = uintptr(4)
+	ioctlSize     = 4
 	hciMaxDevices = 16
 	typHCI        = 72 // 'H'
 )
@@ -144,13 +146,13 @@ func newSocket(fd, n int, chk bool) (*skt, error) {
 
 	// Attempt to use the linux 3.14 feature, if this fails with EINVAL fall back to raw access
 	// on older kernels.
-	sa := unix.SockaddrHCI{Dev: n, Channel: unix.HCI_CHANNEL_USER}
+	sa := unix.SockaddrHCI{Dev: uint16(n), Channel: unix.HCI_CHANNEL_USER}
 	if err := unix.Bind(fd, &sa); err != nil {
 		if err != unix.EINVAL {
 			return nil, err
 		}
 		log.Printf("dev: %s can't bind to hci user channel, err: %s.", name, err)
-		sa := unix.SockaddrHCI{Dev: n, Channel: unix.HCI_CHANNEL_RAW}
+		sa := unix.SockaddrHCI{Dev: uint16(n), Channel: unix.HCI_CHANNEL_RAW}
 		if err := unix.Bind(fd, &sa); err != nil {
 			log.Printf("dev: %s can't bind to hci raw channel, err: %s.", name, err)
 			return nil, err
