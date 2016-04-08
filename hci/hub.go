@@ -74,7 +74,8 @@ func (h *evtHub) handle(b []byte) error {
 		return fmt.Errorf("hci: corrupt event packet: [ % X ]", b)
 	}
 	if f, found := h.evth[code]; found {
-		return f.Handle(b[2:])
+		go f.Handle(b[2:])
+		return nil
 	}
 	return fmt.Errorf("hci: unsupported event packet: [ % X ]", b)
 }
