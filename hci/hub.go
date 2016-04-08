@@ -13,7 +13,7 @@ func newEvtHub() *evtHub {
 		log.Printf("hci: unhandled (TODO) event packet: [ % X ]", b)
 	}
 
-	e := &evtHub{
+	h := &evtHub{
 		evth: map[int]Handler{
 			evt.EncryptionChangeEvent{}.Code():                     HandlerFunc(todo),
 			evt.ReadRemoteVersionInformationCompleteEvent{}.Code(): HandlerFunc(todo),
@@ -27,9 +27,9 @@ func newEvtHub() *evtHub {
 			evt.LERemoteConnectionParameterRequestEvent{}.SubCode(): HandlerFunc(todo),
 		},
 	}
-	e.SetEventHandler(0x3E, HandlerFunc(e.handleLEMeta))
-	e.SetSubeventHandler(evt.LEAdvertisingReportEvent{}.SubCode(), HandlerFunc(e.handleLEAdvertisingReport))
-	return e
+	h.SetEventHandler(0x3E, HandlerFunc(h.handleLEMeta))
+	h.SetSubeventHandler(evt.LEAdvertisingReportEvent{}.SubCode(), HandlerFunc(h.handleLEAdvertisingReport))
+	return h
 }
 
 type evtHub struct {
@@ -38,58 +38,58 @@ type evtHub struct {
 	subh map[int]Handler
 }
 
-func (e *evtHub) EventHandler(c int) Handler {
-	e.Lock()
-	defer e.Unlock()
-	return e.evth[c]
+func (h *evtHub) EventHandler(c int) Handler {
+	h.Lock()
+	defer h.Unlock()
+	return h.evth[c]
 }
 
-func (e *evtHub) SetEventHandler(c int, f Handler) Handler {
-	e.Lock()
-	defer e.Unlock()
-	old := e.evth[c]
-	e.evth[c] = f
+func (h *evtHub) SetEventHandler(c int, f Handler) Handler {
+	h.Lock()
+	defer h.Unlock()
+	old := h.evth[c]
+	h.evth[c] = f
 	return old
 }
 
-func (e *evtHub) SubeventHandler(c int) Handler {
-	e.Lock()
-	defer e.Unlock()
-	return e.subh[c]
+func (h *evtHub) SubeventHandler(c int) Handler {
+	h.Lock()
+	defer h.Unlock()
+	return h.subh[c]
 }
 
-func (e *evtHub) SetSubeventHandler(c int, f Handler) Handler {
-	e.Lock()
-	defer e.Unlock()
-	old := e.subh[c]
-	e.subh[c] = f
+func (h *evtHub) SetSubeventHandler(c int, f Handler) Handler {
+	h.Lock()
+	defer h.Unlock()
+	old := h.subh[c]
+	h.subh[c] = f
 	return old
 }
 
-func (e *evtHub) handle(b []byte) {
-	e.Lock()
-	defer e.Unlock()
+func (h *evtHub) handle(b []byte) {
+	h.Lock()
+	defer h.Unlock()
 	code, plen := int(b[0]), int(b[1])
 	if plen != len(b[2:]) {
 		log.Printf("hci: corrupt event packet: [ % X ]", b)
 	}
-	if f, found := e.evth[code]; found {
+	if f, found := h.evth[code]; found {
 		go f.Handle(b[2:])
 		return
 	}
 	log.Printf("hci: unsupported event packet: [ % X ]", b)
 }
 
-func (e *evtHub) handleLEMeta(b []byte) {
+func (h *evtHub) handleLEMeta(b []byte) {
 	code := int(b[0])
-	if f := e.SubeventHandler(code); f != nil {
+	if f := h.SubeventHandler(code); f != nil {
 		f.Handle(b)
 		return
 	}
 	log.Printf("Unsupported LE event: [ % X ]", b)
 }
 
-func (e *evtHub) handleLEAdvertisingReport(p []byte) {
+func (h *evtHub) handleLEAdvertisingReport(p []byte) {
 	e := &evt.LEAdvertisingReportEvent{}
 	if err := e.Unmarshal(p); err != nil {
 		return
