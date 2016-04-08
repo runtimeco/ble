@@ -284,13 +284,14 @@ func (d *Device) handlePeripheral(l2c l2cap.Conn) {
 		d.PeripheralDisconnected(p, nil)
 	}
 }
-func (d *Device) handleLEAdvertisingReport(b []byte) {
+
+func (d *Device) handleLEAdvertisingReport(b []byte) error {
 	if d.PeripheralDiscovered == nil {
-		return
+		return nil
 	}
 	e := &leAdvertisingReportEP{}
 	if err := e.Unmarshal(b); err != nil {
-		return
+		return err
 	}
 
 	for _, r := range e.Reports {
@@ -305,6 +306,7 @@ func (d *Device) handleLEAdvertisingReport(b []byte) {
 		}
 		go d.PeripheralDiscovered(p, adv, r.RSSI)
 	}
+	return nil
 }
 
 type advertisingReport struct {

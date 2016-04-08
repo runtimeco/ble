@@ -38,16 +38,16 @@ type CommandSender interface {
 
 // A Handler handles an HCI event packets.
 type Handler interface {
-	Handle([]byte)
+	Handle([]byte) error
 }
 
 // The HandlerFunc type is an adapter to allow the use of ordinary functions as packet or event handlers.
 // If f is a function with the appropriate signature, HandlerFunc(f) is a Handler object that calls f.
-type HandlerFunc func(b []byte)
+type HandlerFunc func(b []byte) error
 
 // Handle handles an event packet.
-func (f HandlerFunc) Handle(b []byte) {
-	f(b)
+func (f HandlerFunc) Handle(b []byte) error {
+	return f(b)
 }
 
 // EventHub ...

@@ -1,8 +1,8 @@
 package l2cap
 
 import (
+	"fmt"
 	"io"
-	"log"
 	"sync"
 
 	"github.com/currantlabs/bt/hci"
@@ -66,10 +66,10 @@ func (l *LE) Accept() (Conn, error) {
 	return <-l.chConn, nil
 }
 
-func (l *LE) handleLEConnectionComplete(b []byte) {
+func (l *LE) handleLEConnectionComplete(b []byte) error {
 	e := &evt.LEConnectionCompleteEvent{}
 	if err := e.Unmarshal(b); err != nil {
-		return
+		return err
 	}
 
 	c := newConn(l, e)
@@ -77,36 +77,35 @@ func (l *LE) handleLEConnectionComplete(b []byte) {
 	l.conns[e.ConnectionHandle] = c
 	l.muConns.Unlock()
 	l.chConn <- c
+	return nil
 }
 
-func (l *LE) handleLEConnectionUpdateComplete(b []byte) {
+func (l *LE) handleLEConnectionUpdateComplete(b []byte) error {
 	e := &evt.LEConnectionUpdateCompleteEvent{}
-	if err := e.Unmarshal(b); err != nil {
-		return
-	}
+	return e.Unmarshal(b)
 }
 
-func (l *LE) handleDisconnectionComplete(b []byte) {
+func (l *LE) handleDisconnectionComplete(b []byte) error {
 	e := &evt.DisconnectionCompleteEvent{}
 	if err := e.Unmarshal(b); err != nil {
-		return
+		return err
 	}
 	l.muConns.Lock()
 	c, found := l.conns[e.ConnectionHandle]
 	delete(l.conns, e.ConnectionHandle)
 	l.muConns.Unlock()
 	if !found {
-		log.Printf("conns: disconnecting an invalid handle %04X", e.ConnectionHandle)
-		return
+		return fmt.Errorf("l2cap: disconnecting an invalid handle %04X", e.ConnectionHandle)
 	}
 	close(c.chInPkt)
 	c.txBuffer.FreeAll()
+	return nil
 }
 
-func (l *LE) handleNumberOfCompletedPackets(b []byte) {
+func (l *LE) handleNumberOfCompletedPackets(b []byte) error {
 	e := &evt.NumberOfCompletedPacketsEvent{}
 	if err := e.Unmarshal(b); err != nil {
-		return
+		return err
 	}
 
 	l.muConns.Lock()
@@ -114,7 +113,7 @@ func (l *LE) handleNumberOfCompletedPackets(b []byte) {
 	for i := 0; i < int(e.NumberOfHandles); i++ {
 		c, ok := l.conns[e.ConnectionHandle[i]]
 		if !ok {
-			return
+			return fmt.Errorf("l2cap: completed packets for non-existing connection")
 		}
 
 		// Add the HCI buffer to the per-connection list. When written buffers are acked by
@@ -125,15 +124,16 @@ func (l *LE) handleNumberOfCompletedPackets(b []byte) {
 			c.txBuffer.Free()
 		}
 	}
+	return nil
 }
 
-func (l *LE) handleLELongTermKeyRequest(b []byte) {
+func (l *LE) handleLELongTermKeyRequest(b []byte) error {
 	e := &evt.LELongTermKeyRequestEvent{}
 	if err := e.Unmarshal(b); err != nil {
-		return
+		return err
 	}
 
-	l.hci.Send(&cmd.LELongTermKeyRequestNegativeReply{
+	return l.hci.Send(&cmd.LELongTermKeyRequestNegativeReply{
 		ConnectionHandle: e.ConnectionHandle,
 	}, nil)
 }

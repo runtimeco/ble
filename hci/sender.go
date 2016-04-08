@@ -1,6 +1,7 @@
 package hci
 
 import (
+	"fmt"
 	"io"
 	"log"
 
@@ -66,31 +67,32 @@ func (s *cmdSender) loop() {
 	}
 }
 
-func (s *cmdSender) handleCommandComplete(b []byte) {
+func (s *cmdSender) handleCommandComplete(b []byte) error {
 	var e evt.CommandCompleteEvent
 	if err := e.Unmarshal(b); err != nil {
-		return
+		return err
 	}
 
 	for i := 0; i < int(e.NumHCICommandPackets); i++ {
 		s.chBufs <- make([]byte, 64)
 	}
+
+	// NOP command, used for flow control purpose [Vol 2, Part E, 4.4]
 	if e.CommandOpcode == 0x0000 {
-		// NOP command, used for flow control purpose [Vol 2, Part E, 4.4]
-		return
+		return nil
 	}
 	p, found := s.sent[int(e.CommandOpcode)]
 	if !found {
-		log.Printf("event: can't find the cmd for CommandCompleteEP: %v", e)
-		return
+		return fmt.Errorf("hci: can't find the cmd for CommandCompleteEP: %v", e)
 	}
 	p.done <- e.ReturnParameters
+	return nil
 }
 
-func (s *cmdSender) handleCommandStatus(b []byte) {
+func (s *cmdSender) handleCommandStatus(b []byte) error {
 	var e evt.CommandStatusEvent
 	if err := e.Unmarshal(b); err != nil {
-		return
+		return err
 	}
 
 	for i := 0; i < int(e.NumHCICommandPackets); i++ {
@@ -98,8 +100,8 @@ func (s *cmdSender) handleCommandStatus(b []byte) {
 	}
 	p, found := s.sent[int(e.CommandOpcode)]
 	if !found {
-		log.Printf("event: can't find the cmd for CommandStatusEP: %v", e)
-		return
+		return fmt.Errorf("hci: can't find the cmd for CommandStatusEP: %v", e)
 	}
 	close(p.done)
+	return nil
 }

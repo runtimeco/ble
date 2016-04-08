@@ -9,8 +9,8 @@ import (
 )
 
 func newEvtHub() *evtHub {
-	todo := func(b []byte) {
-		log.Printf("hci: unhandled (TODO) event packet: [ % X ]", b)
+	todo := func(b []byte) error {
+		return fmt.Errorf("hci: unhandled (TODO) event packet: [ % X ]", b)
 	}
 
 	h := &evtHub{
@@ -66,33 +66,31 @@ func (h *evtHub) SetSubeventHandler(c int, f Handler) Handler {
 	return old
 }
 
-func (h *evtHub) handle(b []byte) {
+func (h *evtHub) handle(b []byte) error {
 	h.Lock()
 	defer h.Unlock()
 	code, plen := int(b[0]), int(b[1])
 	if plen != len(b[2:]) {
-		log.Printf("hci: corrupt event packet: [ % X ]", b)
+		return fmt.Errorf("hci: corrupt event packet: [ % X ]", b)
 	}
 	if f, found := h.evth[code]; found {
-		go f.Handle(b[2:])
-		return
+		return f.Handle(b[2:])
 	}
-	log.Printf("hci: unsupported event packet: [ % X ]", b)
+	return fmt.Errorf("hci: unsupported event packet: [ % X ]", b)
 }
 
-func (h *evtHub) handleLEMeta(b []byte) {
+func (h *evtHub) handleLEMeta(b []byte) error {
 	code := int(b[0])
 	if f := h.SubeventHandler(code); f != nil {
-		f.Handle(b)
-		return
+		return f.Handle(b)
 	}
-	log.Printf("Unsupported LE event: [ % X ]", b)
+	return fmt.Errorf("hci: unsupported LE event: [ % X ]", b)
 }
 
-func (h *evtHub) handleLEAdvertisingReport(p []byte) {
+func (h *evtHub) handleLEAdvertisingReport(p []byte) error {
 	e := &evt.LEAdvertisingReportEvent{}
 	if err := e.Unmarshal(p); err != nil {
-		return
+		return err
 	}
 	f := func(a [6]byte) string {
 		return fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X", a[5], a[4], a[3], a[2], a[1], a[0])
@@ -101,4 +99,5 @@ func (h *evtHub) handleLEAdvertisingReport(p []byte) {
 		log.Printf("%d, %d, %s, %d, [% X]",
 			e.EventType[i], e.AddressType[i], f(e.Address[i]), e.RSSI[i], e.Data[i])
 	}
+	return nil
 }

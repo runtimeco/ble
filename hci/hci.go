@@ -113,7 +113,12 @@ func (h *hci) handlePkt(b []byte) {
 	case pktTypeSCOData:
 		log.Printf("hci: unsupported sco packet: [ % X ]", b)
 	case pktTypeEvent:
-		go h.evtHub.handle(b)
+		go func() {
+			err := h.evtHub.handle(b)
+			if err != nil {
+				log.Printf("hci: event error :%s", err)
+			}
+		}()
 	case pktTypeVendor:
 		log.Printf("hci: unsupported vendor packet: [ % X ]", b)
 	default:
