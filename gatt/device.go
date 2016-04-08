@@ -109,7 +109,7 @@ func (d *Device) Init(f func(*Device, State)) error {
 
 	// Register our own advertising report handler.
 	d.hci.SetSubeventHandler(
-		evt.LEAdvertisingReportEvent{}.SubCode(),
+		evt.LEAdvertisingReportSubCode,
 		hci.HandlerFunc(d.handleLEAdvertisingReport))
 	d.state = StatePoweredOn
 	d.StateChanged = f
@@ -241,7 +241,7 @@ func (d *Device) Connect(p *Peripheral) {
 // CancelConnection disconnects a remote peripheral.
 func (d *Device) CancelConnection(p *Peripheral) {
 	d.hci.Send(&cmd.Disconnect{
-		ConnectionHandle: p.c.Conn.Parameters().ConnectionHandle,
+		ConnectionHandle: p.c.Conn.Parameters().ConnectionHandle(),
 		Reason:           0x13,
 	}, nil)
 }
@@ -252,7 +252,7 @@ func (d *Device) acceptLoop() {
 		if err != nil {
 			log.Fatalf("can't accept conn: %s", err)
 		}
-		if l2c.Parameters().Role == 0x01 {
+		if l2c.Parameters().Role() == 0x01 {
 			d.handleCentral(l2c)
 			continue
 		}

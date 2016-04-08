@@ -1,7 +1,7 @@
 {
         "Events": [
                 {
-                        "Name": "Disconnection Complete Event",
+                        "Name": "Disconnection Complete",
                         "Spec": "Vol 2, Part E, 7.7.5",
                         "Code": "0x05",
                         "Param": [
@@ -18,7 +18,7 @@
                         "DefaultUnmarshaller": true
                 },
                 {
-                        "Name": "Encryption Change Event",
+                        "Name": "Encryption Change",
                         "Spec": "Vol 2, Part E, 7.7.8",
                         "Code": "0x08",
                         "Param": [
@@ -35,7 +35,7 @@
                         "DefaultUnmarshaller": true
                 },
                 {
-                        "Name": "Read Remote Version Information Complete Event",
+                        "Name": "Read Remote Version Information Complete",
                         "Spec": "Vol 2, Part E, 7.7.12",
                         "Code": "0x0C",
                         "Param": [
@@ -58,7 +58,7 @@
                         "DefaultUnmarshaller": true
                 },
                 {
-                        "Name": "Command Complete Event",
+                        "Name": "Command Complete",
                         "Spec": "Vol 2, Part E, 7.7.14",
                         "Code": "0x0E",
                         "Param": [
@@ -75,7 +75,7 @@
                         "DefaultUnmarshaller": false
                 },
                 {
-                        "Name": "Command Status Event",
+                        "Name": "Command Status",
                         "Spec": "Vol 2, Part E, 7.7.15",
                         "Code": "0x0F",
                         "Param": [
@@ -92,7 +92,7 @@
                         "DefaultUnmarshaller": true
                 },
                 {
-                        "Name": "Hardware Error Event",
+                        "Name": "Hardware Error",
                         "Spec": "Vol 2, Part E, 7.7.16",
                         "Code": "0x10",
                         "Param": [
@@ -103,7 +103,7 @@
                         "DefaultUnmarshaller": true
                 },
                 {
-                        "Name": "Number Of Completed Packets Event",
+                        "Name": "Number Of Completed Packets",
                         "Spec": "Vol 2, Part E, 7.7.19",
                         "Code": "0x13",
                         "Param": [
@@ -120,7 +120,7 @@
                         "DefaultUnmarshaller": false
                 },
                 {
-                        "Name": "Data Buffer Overflow Event",
+                        "Name": "Data Buffer Overflow",
                         "Spec": "Vol 2, Part E, 7.7.26",
                         "Code": "0x1A",
                         "Param": [
@@ -131,7 +131,7 @@
                         "DefaultUnmarshaller": true
                 },
                 {
-                        "Name": "Encryption Key Refresh Complete Event",
+                        "Name": "Encryption Key Refresh Complete",
                         "Spec": "Vol 2, Part E, 7.7.39",
                         "Code": "0x30",
                         "Param": [
@@ -145,7 +145,7 @@
                         "DefaultUnmarshaller": true
                 },
                 {
-                        "Name": "LE Connection Complete Event",
+                        "Name": "LE Connection Complete",
                         "Spec": "Vol 2, Part E, 7.7.65.1",
                         "Code": "0x3E",
                         "SubCode": "0x01",
@@ -184,7 +184,7 @@
                         "DefaultUnmarshaller": true
                 },
                 {
-                        "Name": "LE Advertising Report Event",
+                        "Name": "LE Advertising Report",
                         "Spec": "Vol 2, Part E, 7.7.65.2",
                         "Code": "0x3E",
                         "SubCode": "0x02",
@@ -217,7 +217,7 @@
                         "DefaultUnmarshaller": false
                 },
                 {
-                        "Name": "LE Connection Update Complete Event",
+                        "Name": "LE Connection Update Complete",
                         "Spec": "Vol 2, Part E, 7.7.65.3",
                         "Code": "0x0E",
                         "SubCode": "0x03",
@@ -244,7 +244,7 @@
                         "DefaultUnmarshaller": true
                 },
                 {
-                        "Name": "LE Read Remote Used Features Complete Event",
+                        "Name": "LE Read Remote Used Features Complete",
                         "Spec": "Vol 2, Part E, 7.7.65.4",
                         "Code": "0x3E",
                         "SubCode": "0x04",
@@ -265,7 +265,7 @@
                         "DefaultUnmarshaller": true
                 },
                 {
-                        "Name": "LE Long Term Key Request Event",
+                        "Name": "LE Long Term Key Request",
                         "Spec": "Vol 2, Part E, 7.7.65.5",
                         "Code": "0x3E",
                         "SubCode": "0x05",
@@ -286,7 +286,7 @@
                         "DefaultUnmarshaller": true
                 },
                 {
-                        "Name": "LE Remote Connection Parameter Request Event",
+                        "Name": "LE Remote Connection Parameter Request",
                         "Spec": "Vol 2, Part E, 7.7.65.6",
                         "Code": "0x3E",
                         "SubCode": "0x06",
@@ -313,7 +313,7 @@
                         "DefaultUnmarshaller": true
                 },
                 {
-                        "Name": "Authenticated Payload Timeout Expired Event",
+                        "Name": "Authenticated Payload Timeout Expired",
                         "Spec": "Vol 2, Part E, 7.7.75",
                         "Code": "0x57",
                         "Param": [

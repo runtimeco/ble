@@ -34,13 +34,13 @@ type Conn interface {
 	// SetRxMTU sets the MTU which the upper layer of remote device is capable of accepting.
 	SetTxMTU(mtu int)
 
-	Parameters() *evt.LEConnectionCompleteEvent
+	Parameters() evt.LEConnectionComplete
 }
 
 type conn struct {
 	l *LE
 
-	param *evt.LEConnectionCompleteEvent
+	param evt.LEConnectionComplete
 
 	// Maximum Transmission Unit (MTU) is the maximum size of payload data
 	// which the upper layer entity is capable of accepting. [Vol 3, Part A, 1.4]
@@ -87,7 +87,7 @@ type conn struct {
 	txBuffer *Client
 }
 
-func newConn(l *LE, param *evt.LEConnectionCompleteEvent) *conn {
+func newConn(l *LE, param evt.LEConnectionComplete) *conn {
 	c := &conn{
 		l:     l,
 		param: param,
@@ -213,10 +213,10 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 		}
 
 		// Prepare the Headers
-		binary.Write(pkt, binary.LittleEndian, uint8(pktTypeACLData))                       // HCI Header: pkt Type
-		binary.Write(pkt, binary.LittleEndian, uint16(c.param.ConnectionHandle|(flags<<8))) // ACL Header: handle and flags
-		binary.Write(pkt, binary.LittleEndian, uint16(flen))                                // ACL Header: data len
-		binary.Write(pkt, binary.LittleEndian, pdu[:flen])                                  // Append payload
+		binary.Write(pkt, binary.LittleEndian, uint8(pktTypeACLData))                         // HCI Header: pkt Type
+		binary.Write(pkt, binary.LittleEndian, uint16(c.param.ConnectionHandle()|(flags<<8))) // ACL Header: handle and flags
+		binary.Write(pkt, binary.LittleEndian, uint16(flen))                                  // ACL Header: data len
+		binary.Write(pkt, binary.LittleEndian, pdu[:flen])                                    // Append payload
 
 		// Flush the pkt to HCI
 		if _, err := c.l.pktWriter.Write(pkt.Bytes()); err != nil {
@@ -285,7 +285,7 @@ func (c *conn) LocalAddr() net.HardwareAddr {
 
 // RemoteAddr returns remote device's MAC address.
 func (c *conn) RemoteAddr() net.HardwareAddr {
-	a := c.param.PeerAddress
+	a := c.param.PeerAddress()
 	return net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]})
 }
 
@@ -304,7 +304,7 @@ func (c *conn) SetTxMTU(mtu int) {
 	c.txMPS = mtu
 }
 
-func (c *conn) Parameters() *evt.LEConnectionCompleteEvent {
+func (c *conn) Parameters() evt.LEConnectionComplete {
 	return c.param
 }
 

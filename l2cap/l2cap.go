@@ -41,12 +41,12 @@ func NewL2CAP(h hci.HCI) *LE {
 	l.pktWriter = w
 	l.pool = NewPool(1+4+size, cnt)
 
-	h.SetEventHandler(evt.DisconnectionCompleteEvent{}.Code(), hci.HandlerFunc(l.handleDisconnectionComplete))
-	h.SetEventHandler(evt.NumberOfCompletedPacketsEvent{}.Code(), hci.HandlerFunc(l.handleNumberOfCompletedPackets))
+	h.SetEventHandler(evt.DisconnectionCompleteCode, hci.HandlerFunc(l.handleDisconnectionComplete))
+	h.SetEventHandler(evt.NumberOfCompletedPacketsCode, hci.HandlerFunc(l.handleNumberOfCompletedPackets))
 
-	h.SetSubeventHandler(evt.LEConnectionCompleteEvent{}.SubCode(), hci.HandlerFunc(l.handleLEConnectionComplete))
-	h.SetSubeventHandler(evt.LEConnectionUpdateCompleteEvent{}.SubCode(), hci.HandlerFunc(l.handleLEConnectionUpdateComplete))
-	h.SetSubeventHandler(evt.LELongTermKeyRequestEvent{}.SubCode(), hci.HandlerFunc(l.handleLELongTermKeyRequest))
+	h.SetSubeventHandler(evt.LEConnectionCompleteSubCode, hci.HandlerFunc(l.handleLEConnectionComplete))
+	h.SetSubeventHandler(evt.LEConnectionUpdateCompleteSubCode, hci.HandlerFunc(l.handleLEConnectionUpdateComplete))
+	h.SetSubeventHandler(evt.LELongTermKeyRequestSubCode, hci.HandlerFunc(l.handleLELongTermKeyRequest))
 
 	return l
 }
@@ -68,32 +68,26 @@ func (l *LE) Accept() (Conn, error) {
 }
 
 func (l *LE) handleLEConnectionComplete(b []byte) error {
-	e := &evt.LEConnectionCompleteEvent{}
-	if err := e.Unmarshal(b); err != nil {
-		return err
-	}
+	e := evt.LEConnectionComplete(b)
 
 	c := newConn(l, e)
 	l.muConns.Lock()
-	l.conns[e.ConnectionHandle] = c
+	l.conns[e.ConnectionHandle()] = c
 	l.muConns.Unlock()
 	l.chConn <- c
 	return nil
 }
 
 func (l *LE) handleLEConnectionUpdateComplete(b []byte) error {
-	e := &evt.LEConnectionUpdateCompleteEvent{}
-	return e.Unmarshal(b)
+	// TODO: anything todo?
+	return nil
 }
 
 func (l *LE) handleDisconnectionComplete(b []byte) error {
-	e := &evt.DisconnectionCompleteEvent{}
-	if err := e.Unmarshal(b); err != nil {
-		return err
-	}
+	e := evt.DisconnectionComplete(b)
 	l.muConns.Lock()
-	c, found := l.conns[e.ConnectionHandle]
-	delete(l.conns, e.ConnectionHandle)
+	c, found := l.conns[e.ConnectionHandle()]
+	delete(l.conns, e.ConnectionHandle())
 	l.muConns.Unlock()
 	if !found {
 		return fmt.Errorf("l2cap: disconnecting an invalid handle %04X", e.ConnectionHandle)
@@ -107,21 +101,18 @@ func (l *LE) handleDisconnectionComplete(b []byte) error {
 }
 
 func (l *LE) handleNumberOfCompletedPackets(b []byte) error {
-	e := &evt.NumberOfCompletedPacketsEvent{}
-	if err := e.Unmarshal(b); err != nil {
-		return err
-	}
+	e := evt.NumberOfCompletedPackets(b)
 
 	l.muConns.Lock()
 	defer l.muConns.Unlock()
-	for i := 0; i < int(e.NumberOfHandles); i++ {
-		c, found := l.conns[e.ConnectionHandle[i]]
+	for i := 0; i < int(e.NumberOfHandles()); i++ {
+		c, found := l.conns[e.ConnectionHandle(i)]
 		if !found {
 			continue
 		}
 
 		// Put the delivered buffers back to the pool.
-		for j := 0; j < int(e.HCNumOfCompletedPackets[i]); j++ {
+		for j := 0; j < int(e.HCNumOfCompletedPackets(i)); j++ {
 			c.txBuffer.Put()
 		}
 	}
@@ -129,12 +120,9 @@ func (l *LE) handleNumberOfCompletedPackets(b []byte) error {
 }
 
 func (l *LE) handleLELongTermKeyRequest(b []byte) error {
-	e := &evt.LELongTermKeyRequestEvent{}
-	if err := e.Unmarshal(b); err != nil {
-		return err
-	}
+	e := evt.LELongTermKeyRequest(b)
 
 	return l.hci.Send(&cmd.LELongTermKeyRequestNegativeReply{
-		ConnectionHandle: e.ConnectionHandle,
+		ConnectionHandle: e.ConnectionHandle(),
 	}, nil)
 }

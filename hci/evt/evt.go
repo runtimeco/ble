@@ -1,76 +1,45 @@
 package evt
 
-import (
-	"bytes"
-	"encoding/binary"
-)
+import "encoding/binary"
 
-type event interface {
-	Unmarshal(b []byte) error
+func (e CommandComplete) NumHCICommandPackets() uint8 { return e[0] }
+func (e CommandComplete) CommandOpcode() uint16       { return binary.LittleEndian.Uint16(e[1:]) }
+func (e CommandComplete) ReturnParameters() []byte    { return e[3:] }
+
+func (e NumberOfCompletedPackets) NumberOfHandles() uint8 { return e[0] }
+func (e NumberOfCompletedPackets) ConnectionHandle(i int) uint16 {
+	return binary.LittleEndian.Uint16(e[1+i*2:])
+}
+func (e NumberOfCompletedPackets) HCNumOfCompletedPackets(i int) uint16 {
+	return binary.LittleEndian.Uint16(e[1+int(e.NumberOfHandles())*2:])
 }
 
-func unmarshal(e event, b []byte) error {
-	return binary.Read(bytes.NewBuffer(b), binary.LittleEndian, e)
+func (e LEAdvertisingReport) SubeventCode() uint8     { return e[0] }
+func (e LEAdvertisingReport) NumReports() uint8       { return e[1] }
+func (e LEAdvertisingReport) EventType(i int) uint8   { return e[2+i] }
+func (e LEAdvertisingReport) AddressType(i int) uint8 { return e[2+int(e.NumReports())*1+i] }
+func (e LEAdvertisingReport) Address(i int) [6]byte {
+	e = e[2+int(e.NumReports())*2:]
+	b := [6]byte{}
+	copy(b[:], e[6*i:])
+	return b
 }
 
-// Unmarshal de-serializes the binary data and stores the result in the receiver.
-func (e *CommandCompleteEvent) Unmarshal(b []byte) error {
-	buf := bytes.NewBuffer(b)
-	if err := binary.Read(buf, binary.LittleEndian, &e.NumHCICommandPackets); err != nil {
-		return err
+func (e LEAdvertisingReport) LengthData(i int) uint8 { return e[2+int(e.NumReports())*8+i] }
+
+func (e LEAdvertisingReport) Data(i int) []byte {
+	l := 0
+	for j := 0; j < i; j++ {
+		l += int(e.LengthData(j))
 	}
-	if err := binary.Read(buf, binary.LittleEndian, &e.CommandOpcode); err != nil {
-		return err
-	}
-	e.ReturnParameters = buf.Bytes()
-	return nil
+	e = e[2+int(e.NumReports())*9+l:]
+	return e[:e.LengthData(i)]
 }
 
-// Unmarshal de-serializes the binary data and stores the result in the receiver.
-func (e *NumberOfCompletedPacketsEvent) Unmarshal(b []byte) error {
-	e.NumberOfHandles, b = b[0], b[1:]
-	n := int(e.NumberOfHandles)
-	e.ConnectionHandle = make([]uint16, n)
-	e.HCNumOfCompletedPackets = make([]uint16, n)
-
-	for i := 0; i < n; i++ {
-		e.ConnectionHandle[i] = binary.LittleEndian.Uint16(b)
-		e.HCNumOfCompletedPackets[i] = binary.LittleEndian.Uint16(b[2:])
+func (e LEAdvertisingReport) RSSI(i int) int8 {
+	l := 0
+	for j := 0; j < int(e.NumReports()); j++ {
+		l += int(e.LengthData(j))
 	}
-
-	return nil
-}
-
-// Unmarshal de-serializes the binary data and stores the result in the receiver.
-// This implementation only serves as a working reference.
-// To maintain the consistency with those generated code, we stick with the
-// stride style of data fields close to the packet we receive.
-// Serious applications should register their own advertising report event
-// handlers which more efficiently parse interested fields in their own representation.
-func (e *LEAdvertisingReportEvent) Unmarshal(b []byte) error {
-
-	e.SubeventCode, b = b[0], b[1:]
-	e.NumReports, b = b[0], b[1:]
-	n := int(e.NumReports)
-
-	e.EventType = make([]uint8, n)
-	e.AddressType = make([]uint8, n)
-	e.Address = make([][6]uint8, n)
-	e.Data = make([][]byte, n)
-	e.Length = make([]uint8, n)
-	e.RSSI = make([]int8, n)
-
-	for i := 0; i < n; i++ {
-		e.EventType[i] = b[0]
-		e.AddressType[i] = b[1]
-		copy(e.Address[i][:6], b[2:])
-		e.Length[i] = b[8]
-		dlen := int(e.Length[i])
-		e.Data[i] = make([]byte, dlen)
-		copy(e.Data[i], b[9:])
-		e.RSSI[i] = int8(b[9+dlen])
-		b = b[1+1+6+1+dlen+1:]
-	}
-
-	return nil
+	return int8(e[2+int(e.NumReports())*9+l+i])
 }

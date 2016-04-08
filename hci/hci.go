@@ -45,8 +45,8 @@ func NewHCI(id int) (HCI, error) {
 		evt: newEvtHub(),
 	}
 
-	h.SetEventHandler(evt.CommandCompleteEvent{}.Code(), HandlerFunc(h.cmd.handleCommandComplete))
-	h.SetEventHandler(evt.CommandStatusEvent{}.Code(), HandlerFunc(h.cmd.handleCommandStatus))
+	h.SetEventHandler(evt.CommandCompleteCode, HandlerFunc(h.cmd.handleCommandComplete))
+	h.SetEventHandler(evt.CommandStatusCode, HandlerFunc(h.cmd.handleCommandStatus))
 	go h.loop()
 	return h, h.init()
 }

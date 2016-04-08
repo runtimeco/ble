@@ -15,20 +15,20 @@ func newEvtHub() *evtHub {
 
 	h := &evtHub{
 		evth: map[int]Handler{
-			evt.EncryptionChangeEvent{}.Code():                     HandlerFunc(todo),
-			evt.ReadRemoteVersionInformationCompleteEvent{}.Code(): HandlerFunc(todo),
-			evt.HardwareErrorEvent{}.Code():                        HandlerFunc(todo),
-			evt.DataBufferOverflowEvent{}.Code():                   HandlerFunc(todo),
-			evt.EncryptionKeyRefreshCompleteEvent{}.Code():         HandlerFunc(todo),
-			evt.AuthenticatedPayloadTimeoutExpiredEvent{}.Code():   HandlerFunc(todo),
+			evt.EncryptionChangeCode:                     HandlerFunc(todo),
+			evt.ReadRemoteVersionInformationCompleteCode: HandlerFunc(todo),
+			evt.HardwareErrorCode:                        HandlerFunc(todo),
+			evt.DataBufferOverflowCode:                   HandlerFunc(todo),
+			evt.EncryptionKeyRefreshCompleteCode:         HandlerFunc(todo),
+			evt.AuthenticatedPayloadTimeoutExpiredCode:   HandlerFunc(todo),
 		},
 		subh: map[int]Handler{
-			evt.LEReadRemoteUsedFeaturesCompleteEvent{}.SubCode():   HandlerFunc(todo),
-			evt.LERemoteConnectionParameterRequestEvent{}.SubCode(): HandlerFunc(todo),
+			evt.LEReadRemoteUsedFeaturesCompleteSubCode:   HandlerFunc(todo),
+			evt.LERemoteConnectionParameterRequestSubCode: HandlerFunc(todo),
 		},
 	}
 	h.SetEventHandler(0x3E, HandlerFunc(h.handleLEMeta))
-	h.SetSubeventHandler(evt.LEAdvertisingReportEvent{}.SubCode(), HandlerFunc(h.handleLEAdvertisingReport))
+	h.SetSubeventHandler(evt.LEAdvertisingReportSubCode, HandlerFunc(h.handleLEAdvertisingReport))
 	return h
 }
 
@@ -86,16 +86,13 @@ func (h *evtHub) handleLEMeta(b []byte) error {
 }
 
 func (h *evtHub) handleLEAdvertisingReport(p []byte) error {
-	e := &evt.LEAdvertisingReportEvent{}
-	if err := e.Unmarshal(p); err != nil {
-		return err
-	}
+	e := evt.LEAdvertisingReport(p[1:])
 	f := func(a [6]byte) string {
 		return fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X", a[5], a[4], a[3], a[2], a[1], a[0])
 	}
-	for i := 0; i < int(e.NumReports); i++ {
+	for i := 0; i < int(e.NumReports()); i++ {
 		log.Printf("%d, %d, %s, %d, [% X]",
-			e.EventType[i], e.AddressType[i], f(e.Address[i]), e.RSSI[i], e.Data[i])
+			e.EventType(i), e.AddressType(i), f(e.Address(i)), e.RSSI(i), e.Data(i))
 	}
 	return nil
 }
