@@ -8,7 +8,7 @@ import (
 // HCI ...
 type HCI interface {
 	CommandSender
-	EventHandler
+	EventHub
 	ACLProcessor
 
 	// LocalAddr returns the MAC address of local skt.
@@ -50,8 +50,8 @@ func (f HandlerFunc) Handle(b []byte) {
 	f(b)
 }
 
-// EventHandler ...
-type EventHandler interface {
+// EventHub ...
+type EventHub interface {
 	// SetEventHandler registers the handler to handle the HCI event, and returns current handler.
 	SetEventHandler(c int, h Handler) Handler
 

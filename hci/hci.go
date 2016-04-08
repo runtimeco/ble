@@ -26,7 +26,7 @@ type hci struct {
 	cmdSender *cmdSender
 
 	// HCI event handling.
-	evtHandler *evtHandler
+	evtHub *evtHub
 
 	// ACL data packet handling.
 	aclProcessor *aclProcessor
@@ -47,7 +47,7 @@ func NewHCI(devID int, chk bool) (HCI, error) {
 		skt:          skt,
 		cmdSender:    newCmdSender(skt),
 		aclProcessor: newACLProcessor(skt),
-		evtHandler:   newEvtHandler(),
+		evtHub:       newEvtHub(),
 	}
 
 	h.SetEventHandler(evt.CommandCompleteEvent{}.Code(), HandlerFunc(h.cmdSender.handleCommandComplete))
@@ -63,15 +63,15 @@ func (h *hci) Send(c Command, r CommandRP) error {
 
 // SetEventHandler registers the handler to handle the hci event, and returns current handler.
 func (h *hci) SetEventHandler(c int, f Handler) Handler {
-	return h.evtHandler.SetEventHandler(c, f)
+	return h.evtHub.SetEventHandler(c, f)
 }
 
 // SetSubeventHandler registers the handler to handle the hci subevent, and returns current handler.
 func (h *hci) SetSubeventHandler(c int, f Handler) Handler {
-	return h.evtHandler.SetSubeventHandler(c, f)
+	return h.evtHub.SetSubeventHandler(c, f)
 }
 
-// LocalAddr ...
+// LocalAddr returns device's MAC address.
 func (h *hci) LocalAddr() net.HardwareAddr {
 	return h.addr
 }
@@ -113,7 +113,7 @@ func (h *hci) handlePkt(b []byte) {
 	case pktTypeSCOData:
 		log.Printf("hci: unsupported sco packet: [ % X ]", b)
 	case pktTypeEvent:
-		go h.evtHandler.handle(b)
+		go h.evtHub.handle(b)
 	case pktTypeVendor:
 		log.Printf("hci: unsupported vendor packet: [ % X ]", b)
 	default:

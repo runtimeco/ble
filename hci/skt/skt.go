@@ -12,17 +12,14 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// IoR used for an ioctl that reads data from the skt driver.
 func ioR(t, nr, size uintptr) uintptr {
 	return (2 << 30) | (t << 8) | nr | (size << 16)
 }
 
-// IoW used for an ioctl that writes data to the skt driver.
 func ioW(t, nr, size uintptr) uintptr {
 	return (1 << 30) | (t << 8) | nr | (size << 16)
 }
 
-// Ioctl simplified ioct call
 func ioctl(fd, op, arg uintptr) error {
 	if _, _, ep := unix.Syscall(unix.SYS_IOCTL, fd, op, arg); ep != 0 {
 		return syscall.Errno(ep)
@@ -108,10 +105,10 @@ func NewSocket(n int, chk bool) (*skt, error) {
 		return nil, err
 	}
 	for i := 0; i < int(req.devNum); i++ {
-		d, err := newSocket(fd, i, chk)
+		s, err := newSocket(fd, i, chk)
 		if err == nil {
-			log.Printf("dev: %s opened", d.name)
-			return d, err
+			log.Printf("dev: %s opened", s.name)
+			return s, err
 		}
 	}
 	return nil, errors.New("no supported devices available")
@@ -167,18 +164,18 @@ func newSocket(fd, n int, chk bool) (*skt, error) {
 	}, nil
 }
 
-func (d *skt) Read(b []byte) (int, error) {
-	d.rmu.Lock()
-	defer d.rmu.Unlock()
-	return unix.Read(d.fd, b)
+func (s *skt) Read(b []byte) (int, error) {
+	s.rmu.Lock()
+	defer s.rmu.Unlock()
+	return unix.Read(s.fd, b)
 }
 
-func (d *skt) Write(b []byte) (int, error) {
-	d.wmu.Lock()
-	defer d.wmu.Unlock()
-	return unix.Write(d.fd, b)
+func (s *skt) Write(b []byte) (int, error) {
+	s.wmu.Lock()
+	defer s.wmu.Unlock()
+	return unix.Write(s.fd, b)
 }
 
-func (d *skt) Close() error {
-	return unix.Close(d.fd)
+func (s *skt) Close() error {
+	return unix.Close(s.fd)
 }
