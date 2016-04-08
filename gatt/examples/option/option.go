@@ -8,7 +8,7 @@ import (
 // DefaultClientOptions ...
 var DefaultClientOptions = []gatt.Option{
 	gatt.LnxMaxConnections(1),
-	gatt.LnxDeviceID(-1, true),
+	gatt.LnxDeviceID(-1),
 	gatt.LnxSetScanParameters(
 		&cmd.LESetScanParameters{
 			LEScanType:           0x01,   // [0x00]: passive, 0x01: active
@@ -37,7 +37,7 @@ var DefaultClientOptions = []gatt.Option{
 // DefaultServerOptions include default options.
 var DefaultServerOptions = []gatt.Option{
 	gatt.LnxMaxConnections(1),
-	gatt.LnxDeviceID(-1, true),
+	gatt.LnxDeviceID(-1),
 	gatt.LnxSetAdvertisingParameters(
 		&cmd.LESetAdvertisingParameters{
 			AdvertisingIntervalMin:  0x010,     // [0x0800]: 0.625 ms * 0x0800 = 1280.0 ms

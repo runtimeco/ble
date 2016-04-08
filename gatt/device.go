@@ -76,7 +76,6 @@ type Device struct {
 	attrs *att.Range
 
 	devID   int
-	chkLE   bool
 	maxConn int
 
 	advData   *cmd.LESetAdvertisingData
@@ -89,12 +88,11 @@ type Device struct {
 // NewDevice ...
 func NewDevice(opts ...Option) (*Device, error) {
 	d := &Device{
-		maxConn: 1,    // Support 1 connection at a time.
-		devID:   -1,   // Find an available HCI Device.
-		chkLE:   true, // Check if the Device supports LE.
+		maxConn: 1,  // Support 1 connection at a time.
+		devID:   -1, // Find an available HCI Device.
 
 	}
-	h, err := hci.NewHCI(d.devID, d.chkLE)
+	h, err := hci.NewHCI(d.devID)
 	if err != nil {
 		return nil, err
 	}

@@ -201,13 +201,13 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 	// All L2CAP fragments associated with an L2CAP PDU shall be processed for
 	// transmission by the Controller before any other L2CAP PDU for the same
 	// logical transport shall be processed.
-	c.txBuffer.Lock()
-	defer c.txBuffer.Unlock()
+	c.txBuffer.LockPool()
+	defer c.txBuffer.UnlockPool()
 
 	for len(pdu) > 0 {
 		// Get a buffer from our pre-allocated and flow-controlled pool.
-		pkt := c.txBuffer.Alloc() // ACL pkt
-		flen := len(pdu)          // fragment length
+		pkt := c.txBuffer.Get() // ACL pkt
+		flen := len(pdu)        // fragment length
 		if flen > pkt.Cap()-1-4 {
 			flen = pkt.Cap() - 1 - 4
 		}

@@ -3,6 +3,7 @@ package hci
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 
 	"github.com/currantlabs/bt/hci/cmd"
@@ -20,10 +21,10 @@ const (
 )
 
 type hci struct {
-	skt          io.ReadWriteCloser
-	cmdSender    *cmdSender
-	evtHub       *evtHub
-	aclProcessor *aclProcessor
+	skt io.ReadWriteCloser
+	cmd *cmdSender
+	evt *evtHub
+	acl *aclHandler
 
 	// Device information or status.
 	addr    net.HardwareAddr
@@ -31,33 +32,33 @@ type hci struct {
 }
 
 // NewHCI ...
-func NewHCI(devID int, chk bool) (HCI, error) {
-	skt, err := skt.NewSocket(devID, chk)
+func NewHCI(id int) (HCI, error) {
+	skt, err := skt.NewSocket(id)
 	if err != nil {
 		return nil, err
 	}
 
 	h := &hci{
-		skt:          skt,
-		cmdSender:    newCmdSender(skt),
-		aclProcessor: newACLProcessor(skt),
-		evtHub:       newEvtHub(),
+		skt: skt,
+		cmd: newCmdSender(skt),
+		acl: newACLHandler(skt),
+		evt: newEvtHub(),
 	}
 
-	h.SetEventHandler(evt.CommandCompleteEvent{}.Code(), HandlerFunc(h.cmdSender.handleCommandComplete))
-	h.SetEventHandler(evt.CommandStatusEvent{}.Code(), HandlerFunc(h.cmdSender.handleCommandStatus))
+	h.SetEventHandler(evt.CommandCompleteEvent{}.Code(), HandlerFunc(h.cmd.handleCommandComplete))
+	h.SetEventHandler(evt.CommandStatusEvent{}.Code(), HandlerFunc(h.cmd.handleCommandStatus))
 	go h.loop()
 	return h, h.init()
 }
 
-func (h *hci) Send(c Command, r CommandRP) error { return h.cmdSender.send(c, r) }
+func (h *hci) Send(c Command, r CommandRP) error { return h.cmd.send(c, r) }
 
-func (h *hci) SetEventHandler(c int, f Handler) Handler { return h.evtHub.SetEventHandler(c, f) }
+func (h *hci) SetEventHandler(c int, f Handler) Handler { return h.evt.SetEventHandler(c, f) }
 
-func (h *hci) SetSubeventHandler(c int, f Handler) Handler { return h.evtHub.SetSubeventHandler(c, f) }
+func (h *hci) SetSubeventHandler(c int, f Handler) Handler { return h.evt.SetSubeventHandler(c, f) }
 
-func (h *hci) SetACLProcessor(f func([]byte)) (w io.Writer, size int, cnt int) {
-	return h.aclProcessor.setACLProcessor(f)
+func (h *hci) SetACLHandler(f Handler) (w io.Writer, size int, cnt int) {
+	return h.acl.setACLHandler(f)
 }
 
 func (h *hci) LocalAddr() net.HardwareAddr { return h.addr }
@@ -76,7 +77,10 @@ func (h *hci) loop() {
 		}
 		p := make([]byte, n)
 		copy(p, b)
-		h.handlePkt(p)
+		if err := h.handlePkt(p); err != nil {
+			log.Printf("hci: %s", err)
+
+		}
 	}
 }
 
@@ -85,17 +89,17 @@ func (h *hci) handlePkt(b []byte) error {
 	t, b := b[0], b[1:]
 	switch t {
 	case pktTypeCommand:
-		fmt.Errorf("hci: unmanaged cmd: [ % X ]", b)
+		return fmt.Errorf("hci: unmanaged cmd: [ % X ]", b)
 	case pktTypeACLData:
-		return h.aclProcessor.handleACLData(b)
+		return h.acl.handle(b)
 	case pktTypeSCOData:
-		fmt.Errorf("hci: unsupported sco packet: [ % X ]", b)
+		return fmt.Errorf("hci: unsupported sco packet: [ % X ]", b)
 	case pktTypeEvent:
-		return h.evtHub.handle(b)
+		return h.evt.handle(b)
 	case pktTypeVendor:
-		fmt.Errorf("hci: unsupported vendor packet: [ % X ]", b)
+		return fmt.Errorf("hci: unsupported vendor packet: [ % X ]", b)
 	default:
-		fmt.Errorf("hci: invalid packet: 0x%02X [ % X ]", t, b)
+		return fmt.Errorf("hci: invalid packet: 0x%02X [ % X ]", t, b)
 	}
 }
 
@@ -133,7 +137,7 @@ func (h *hci) init() error {
 	}
 
 	// Assume the buffers are shared between ACL-U and LE-U.
-	ap := h.aclProcessor
+	ap := h.acl
 	ap.bufCnt = int(ReadBufferSizeRP.HCTotalNumACLDataPackets)
 	ap.bufSize = int(ReadBufferSizeRP.HCACLDataPacketLength)
 

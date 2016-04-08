@@ -37,7 +37,7 @@ func NewL2CAP(h hci.HCI) *LE {
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
-	w, size, cnt := h.SetACLProcessor(l.handlePacket)
+	w, size, cnt := h.SetACLHandler(hci.HandlerFunc(l.handlePacket))
 	l.pktWriter = w
 	l.pool = NewPool(1+4+size, cnt)
 
@@ -99,7 +99,10 @@ func (l *LE) handleDisconnectionComplete(b []byte) error {
 		return fmt.Errorf("l2cap: disconnecting an invalid handle %04X", e.ConnectionHandle)
 	}
 	close(c.chInPkt)
-	c.txBuffer.FreeAll()
+
+	// When a connection disconnects, all the sent packets and weren't acked yet
+	// will be recylecd. [Vol2, Part E 4.1.1]
+	c.txBuffer.PutAll()
 	return nil
 }
 
@@ -117,12 +120,9 @@ func (l *LE) handleNumberOfCompletedPackets(b []byte) error {
 			continue
 		}
 
-		// Add the HCI buffer to the per-connection list. When written buffers are acked by
-		// the controller via NumberOfCompletedPackets event, we'll put them back to the pool.
-		// When a connection disconnects, all the sent packets and weren't acked yet
-		// will be recylecd. [Vol2, Part E 4.1.1]
+		// Put the delivered buffers back to the pool.
 		for j := 0; j < int(e.HCNumOfCompletedPackets[i]); j++ {
-			c.txBuffer.Free()
+			c.txBuffer.Put()
 		}
 	}
 	return nil

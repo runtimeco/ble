@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	h, err := hci.NewHCI(-1, false)
+	h, err := hci.NewHCI(-1)
 	if err != nil {
 		log.Printf("filed to new bt: %s", err)
 	}

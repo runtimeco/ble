@@ -26,37 +26,45 @@ func NewPool(sz int, cnt int) *Pool {
 // Client ...
 type Client struct {
 	p    *Pool
-	used chan *bytes.Buffer
+	sent chan *bytes.Buffer
 }
 
 // NewClient ...
 func NewClient(p *Pool) *Client {
-	return &Client{p: p, used: make(chan *bytes.Buffer, p.cnt)}
+	return &Client{p: p, sent: make(chan *bytes.Buffer, p.cnt)}
 }
 
-// Lock ...
-func (c *Client) Lock() { c.p.Lock() }
+// LockPool ...
+func (c *Client) LockPool() { c.p.Lock() }
 
-// Unlock ...
-func (c *Client) Unlock() { c.p.Unlock() }
+// UnlockPool ...
+func (c *Client) UnlockPool() { c.p.Unlock() }
 
-// Alloc ...
-func (c *Client) Alloc() *bytes.Buffer {
+// Get returns a buffer from the shared buffer pool.
+func (c *Client) Get() *bytes.Buffer {
 	b := <-c.p.ch
 	b.Reset()
-	c.used <- b
+	c.sent <- b
 	return b
 }
 
-// Free ...
-func (c *Client) Free() {
-	b := <-c.used
-	c.p.ch <- b
+// Put puts the oldest sent buffer back to the shared pool.
+func (c *Client) Put() {
+	select {
+	case b := <-c.sent:
+		c.p.ch <- b
+	default:
+	}
 }
 
-// FreeAll ...
-func (c *Client) FreeAll() {
-	for b := range c.used {
-		c.p.ch <- b
+// PutAll puts all the sent buffers back to the shared pool.
+func (c *Client) PutAll() {
+	for {
+		select {
+		case b := <-c.sent:
+			c.p.ch <- b
+		default:
+			return
+		}
 	}
 }

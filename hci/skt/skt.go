@@ -4,6 +4,7 @@ package skt
 
 import (
 	"errors"
+	"io"
 	"log"
 	"sync"
 	"syscall"
@@ -91,13 +92,13 @@ type skt struct {
 }
 
 // NewSocket ...
-func NewSocket(n int, chk bool) (*skt, error) {
+func NewSocket(n int) (io.ReadWriteCloser, error) {
 	fd, err := unix.Socket(unix.AF_BLUETOOTH, unix.SOCK_RAW, unix.BTPROTO_HCI)
 	if err != nil {
 		return nil, err
 	}
 	if n != -1 {
-		return newSocket(fd, n, chk)
+		return open(fd, n)
 	}
 
 	req := devListRequest{devNum: hciMaxDevices}
@@ -105,7 +106,7 @@ func NewSocket(n int, chk bool) (*skt, error) {
 		return nil, err
 	}
 	for i := 0; i < int(req.devNum); i++ {
-		s, err := newSocket(fd, i, chk)
+		s, err := open(fd, i)
 		if err == nil {
 			log.Printf("dev: %s opened", s.name)
 			return s, err
@@ -114,46 +115,21 @@ func NewSocket(n int, chk bool) (*skt, error) {
 	return nil, errors.New("no supported devices available")
 }
 
-func newSocket(fd, n int, chk bool) (*skt, error) {
+func open(fd, n int) (*skt, error) {
 	i := hciDevInfo{id: uint16(n)}
 	if err := ioctl(uintptr(fd), hciGetDeviceInfo, uintptr(unsafe.Pointer(&i))); err != nil {
 		return nil, err
 	}
 	name := string(i.name[:])
-	// Check the feature list returned feature list.
-	if chk && i.features[4]&0x40 == 0 {
-		err := errors.New("does not support LE")
-		log.Printf("dev: %s %s", name, err)
-		return nil, err
-	}
-	log.Printf("dev: %s up", name)
-	if err := ioctl(uintptr(fd), hciUpDevice, uintptr(n)); err != nil {
-		if err != unix.EALREADY {
-			return nil, err
-		}
-		log.Printf("dev: %s reset", name)
-		if err := ioctl(uintptr(fd), hciResetDevice, uintptr(n)); err != nil {
-			return nil, err
-		}
-	}
 	log.Printf("dev: %s down", name)
 	if err := ioctl(uintptr(fd), hciDownDevice, uintptr(n)); err != nil {
 		return nil, err
 	}
 
-	// Attempt to use the linux 3.14 feature, if this fails with EINVAL fall back to raw access
-	// on older kernels.
 	sa := unix.SockaddrHCI{Dev: uint16(n), Channel: unix.HCI_CHANNEL_USER}
 	if err := unix.Bind(fd, &sa); err != nil {
-		if err != unix.EINVAL {
-			return nil, err
-		}
 		log.Printf("dev: %s can't bind to hci user channel, err: %s.", name, err)
-		sa := unix.SockaddrHCI{Dev: uint16(n), Channel: unix.HCI_CHANNEL_RAW}
-		if err := unix.Bind(fd, &sa); err != nil {
-			log.Printf("dev: %s can't bind to hci raw channel, err: %s.", name, err)
-			return nil, err
-		}
+		return nil, err
 	}
 	return &skt{
 		fd:   fd,

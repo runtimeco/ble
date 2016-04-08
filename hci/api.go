@@ -9,7 +9,7 @@ import (
 type HCI interface {
 	CommandSender
 	EventHub
-	ACLProcessor
+	ACLHandler
 
 	// LocalAddr returns the MAC address of local skt.
 	LocalAddr() net.HardwareAddr
@@ -59,7 +59,7 @@ type EventHub interface {
 	SetSubeventHandler(c int, h Handler) Handler
 }
 
-// ACLProcessor ...
-type ACLProcessor interface {
-	SetACLProcessor(func([]byte)) (w io.Writer, size int, cnt int)
+// ACLHandler ...
+type ACLHandler interface {
+	SetACLHandler(Handler) (w io.Writer, size int, cnt int)
 }

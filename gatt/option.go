@@ -7,14 +7,10 @@ import (
 
 // LnxDeviceID specifies which HCI device to use.
 // If n is set to -1, all the available HCI devices will be probed.
-// If chk is set to true, LnxDeviceID checks the LE support in the feature list of the HCI device.
-// This is to filter devices that does not support LE. In case some LE driver that doesn't correctly
-// set the LE support in its feature list, user can turn off the check.
 // This option can only be used with NewDevice on Linux implementation.
-func LnxDeviceID(n int, chk bool) Option {
+func LnxDeviceID(n int) Option {
 	return func(d *Device) error {
 		d.devID = n
-		d.chkLE = chk
 		return nil
 	}
 }
