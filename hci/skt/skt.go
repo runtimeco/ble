@@ -121,6 +121,16 @@ func open(fd, n int) (*skt, error) {
 		return nil, err
 	}
 	name := string(i.name[:])
+	log.Printf("dev: %s up", name)
+	if err := ioctl(uintptr(fd), hciUpDevice, uintptr(n)); err != nil {
+		if err != unix.EALREADY {
+			return nil, err
+		}
+		log.Printf("dev: %s reset", name)
+		if err := ioctl(uintptr(fd), hciResetDevice, uintptr(n)); err != nil {
+			return nil, err
+		}
+	}
 	log.Printf("dev: %s down", name)
 	if err := ioctl(uintptr(fd), hciDownDevice, uintptr(n)); err != nil {
 		return nil, err
