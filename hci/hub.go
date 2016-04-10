@@ -86,7 +86,7 @@ func (h *evtHub) handleLEMeta(b []byte) error {
 }
 
 func (h *evtHub) handleLEAdvertisingReport(p []byte) error {
-	e := evt.LEAdvertisingReport(p[1:])
+	e := evt.LEAdvertisingReport(p)
 	f := func(a [6]byte) string {
 		return fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X", a[5], a[4], a[3], a[2], a[1], a[0])
 	}

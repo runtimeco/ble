@@ -32,8 +32,8 @@ func (e LEAdvertisingReport) Data(i int) []byte {
 	for j := 0; j < i; j++ {
 		l += int(e.LengthData(j))
 	}
-	e = e[2+int(e.NumReports())*9+l:]
-	return e[:e.LengthData(i)]
+	b := e[2+int(e.NumReports())*9+l:]
+	return b[:e.LengthData(i)]
 }
 
 func (e LEAdvertisingReport) RSSI(i int) int8 {
