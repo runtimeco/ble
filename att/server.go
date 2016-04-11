@@ -42,7 +42,7 @@ func NewServer(ctx context.Context, a *Range, l2c l2cap.Conn, rxMTU int) *Server
 		rxBuf:     make([]byte, rxMTU, rxMTU),
 		chNotBuf:  make(chan []byte, 1),
 		chIndBuf:  make(chan []byte, 1),
-		chConfirm: make(chan bool),
+		chConfirm: make(chan bool, 1),
 	}
 	s.chNotBuf <- make([]byte, 23, 23)
 	s.chIndBuf <- make([]byte, 23, 23)
@@ -51,7 +51,7 @@ func NewServer(ctx context.Context, a *Range, l2c l2cap.Conn, rxMTU int) *Server
 
 // Notify sends notification to remote central.
 func (s *Server) Notify(h uint16, data []byte) (int, error) {
-	log.Printf("Notifying 0x%04X, %s", h, string(data))
+	// log.Printf("att: notifying 0x%04X, %s", h, string(data))
 
 	// Acquire and reuse notifyBuffer. Release it after usage.
 	nBuf := <-s.chNotBuf
@@ -71,7 +71,7 @@ func (s *Server) Notify(h uint16, data []byte) (int, error) {
 
 // Indicate sends indication to remote central.
 func (s *Server) Indicate(h uint16, data []byte) (int, error) {
-	log.Printf("Indicating 0x%04X, %s", h, string(data))
+	// log.Printf("att: indicating 0x%04X, %s", h, string(data))
 
 	// Acquire and reuse indicateBuffer. Release it after usage.
 	iBuf := <-s.chIndBuf
@@ -124,7 +124,7 @@ func (s *Server) close() error {
 
 func (s *Server) handleRequest(b []byte) []byte {
 	var resp []byte
-	log.Printf("req: % X", b)
+	// log.Printf("att req: % X", b)
 	switch reqType := b[0]; reqType {
 	case ExchangeMTURequestCode:
 		resp = s.handleExchangeMTURequest(b)
@@ -158,7 +158,7 @@ func (s *Server) handleRequest(b []byte) []byte {
 	default:
 		resp = NewErrorResponse(reqType, 0x0000, ErrReqNotSupp)
 	}
-	log.Printf("resp: % X", resp)
+	// log.Printf("att: rsp: % X", resp)
 	return resp
 }
 
