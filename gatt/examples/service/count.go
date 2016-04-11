@@ -34,12 +34,17 @@ func NewCountService() *gatt.Service {
 		gatt.HandlerFunc(func(ctx context.Context, rsp *gatt.ResponseWriter) {
 			n := gatt.Notifier(ctx)
 			cnt := 0
+			log.Printf("Subscribed")
 			for {
 				select {
 				case <-ctx.Done():
+					log.Printf("Unsubscribed")
 					return
 				case <-time.After(time.Second):
-					fmt.Fprintf(n, "Count: %d", cnt)
+					if _, err := fmt.Fprintf(n, "Count: %d", cnt); err != nil {
+						log.Printf("Failed to write : %s", err)
+						return
+					}
 					cnt++
 				}
 			}

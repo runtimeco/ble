@@ -3,6 +3,7 @@ package att
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
 	"log"
 	"time"
 
@@ -90,7 +91,10 @@ func (s *Server) Indicate(h uint16, data []byte) (int, error) {
 		return n, err
 	}
 	select {
-	case <-s.chConfirm:
+	case ok := <-s.chConfirm:
+		if !ok {
+			return 0, io.ErrClosedPipe
+		}
 		return n, nil
 	case <-time.After(time.Second * 30):
 		return 0, ErrSeqProtoTimeout
@@ -114,6 +118,7 @@ func (s *Server) Loop() {
 }
 
 func (s *Server) close() error {
+	s.chConfirm <- false
 	return s.l2c.Close()
 }
 

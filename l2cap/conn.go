@@ -85,6 +85,8 @@ type conn struct {
 	// Host to Controller Data Flow Control pkt-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
 	// chSentBufs tracks the HCI buffer occupied by this connection.
 	txBuffer *Client
+
+	chDone chan bool
 }
 
 func newConn(l *LE, param evt.LEConnectionComplete) *conn {
@@ -105,6 +107,8 @@ func newConn(l *LE, param evt.LEConnectionComplete) *conn {
 		chInPDU: make(chan pdu, 16),
 
 		txBuffer: NewClient(l.pool),
+
+		chDone: make(chan bool),
 	}
 
 	go func() {
@@ -219,6 +223,12 @@ func (c *conn) writePDU(cid uint16, pdu []byte) (int, error) {
 		binary.Write(pkt, binary.LittleEndian, pdu[:flen])                                    // Append payload
 
 		// Flush the pkt to HCI
+		select {
+		case <-c.chDone:
+			return 0, io.ErrClosedPipe
+		default:
+		}
+
 		if _, err := c.l.pktWriter.Write(pkt.Bytes()); err != nil {
 			return sent, err
 		}
@@ -275,6 +285,7 @@ func (c *conn) recombine() error {
 
 // Close disconnects the connection by sending hci disconnect command to the device.
 func (c *conn) Close() error {
+	close(c.chDone)
 	return nil
 }
 

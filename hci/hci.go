@@ -51,19 +51,12 @@ func NewHCI(id int) (HCI, error) {
 	return h, h.init()
 }
 
-func (h *hci) Send(c Command, r CommandRP) error { return h.cmd.send(c, r) }
-
-func (h *hci) SetEventHandler(c int, f Handler) Handler { return h.evt.SetEventHandler(c, f) }
-
-func (h *hci) SetSubeventHandler(c int, f Handler) Handler { return h.evt.SetSubeventHandler(c, f) }
-
-func (h *hci) SetACLHandler(f Handler) (w io.Writer, size int, cnt int) {
-	return h.acl.setACLHandler(f)
-}
-
-func (h *hci) LocalAddr() net.HardwareAddr { return h.addr }
-
-func (h *hci) Stop() error { return h.skt.Close() }
+func (h *hci) Send(c Command, r CommandRP) error                        { return h.cmd.send(c, r) }
+func (h *hci) SetEventHandler(c int, f Handler) Handler                 { return h.evt.SetEventHandler(c, f) }
+func (h *hci) SetSubeventHandler(c int, f Handler) Handler              { return h.evt.SetSubeventHandler(c, f) }
+func (h *hci) SetACLHandler(f Handler) (w io.Writer, size int, cnt int) { return h.acl.setACLHandler(f) }
+func (h *hci) LocalAddr() net.HardwareAddr                              { return h.addr }
+func (h *hci) Stop() error                                              { return h.skt.Close() }
 
 func (h *hci) loop() {
 	b := make([]byte, 4096)

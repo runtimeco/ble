@@ -9,9 +9,7 @@ import (
 )
 
 func newEvtHub() *evtHub {
-	todo := func(b []byte) error {
-		return fmt.Errorf("hci: unhandled (TODO) event packet: [ % X ]", b)
-	}
+	todo := func(b []byte) error { return fmt.Errorf("hci: unhandled (TODO) event packet: [ % X ]", b) }
 
 	h := &evtHub{
 		evth: map[int]Handler{
@@ -78,15 +76,16 @@ func (h *evtHub) handle(b []byte) error {
 }
 
 func (h *evtHub) handleLEMeta(b []byte) error {
-	code := int(b[0])
-	if f := h.SubeventHandler(code); f != nil {
+	subcode := int(b[0])
+	if f := h.SubeventHandler(subcode); f != nil {
 		return f.Handle(b)
 	}
 	return fmt.Errorf("hci: unsupported LE event: [ % X ]", b)
 }
 
-func (h *evtHub) handleLEAdvertisingReport(p []byte) error {
-	e := evt.LEAdvertisingReport(p)
+// Default dummy advertising packet handler.
+func (h *evtHub) handleLEAdvertisingReport(b []byte) error {
+	e := evt.LEAdvertisingReport(b)
 	f := func(a [6]byte) string {
 		return fmt.Sprintf("%02X:%02X:%02X:%02X:%02X:%02X", a[5], a[4], a[3], a[2], a[1], a[0])
 	}

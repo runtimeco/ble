@@ -1,6 +1,9 @@
 package hci
 
-import "io"
+import (
+	"fmt"
+	"io"
+)
 
 type aclHandler struct {
 	skt     io.Writer
@@ -19,5 +22,8 @@ func (a *aclHandler) setACLHandler(h Handler) (w io.Writer, size int, cnt int) {
 }
 
 func (a *aclHandler) handle(b []byte) error {
+	if a.handler == nil {
+		return fmt.Errorf("hci: unhandled ACL packet: % X", b)
+	}
 	return a.handler.Handle(b)
 }

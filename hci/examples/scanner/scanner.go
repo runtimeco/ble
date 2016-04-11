@@ -16,24 +16,20 @@ func main() {
 		log.Printf("filed to new bt: %s", err)
 	}
 
-	h.Send(&cmd.LESetScanEnable{
-		LEScanEnable: 1,
-	}, nil)
+	h.Send(&cmd.LESetScanEnable{LEScanEnable: 1}, nil)
 
-	fmt.Printf("Start scanning for 1 second ...\n")
-	time.Sleep(3 * time.Second)
+	fmt.Printf("Start scanning for 5 seconds ...\n")
+	time.Sleep(5 * time.Second)
 
 	// Register our own advertising report handler.
 	h.SetSubeventHandler(
 		evt.LEAdvertisingReportSubCode,
 		hci.HandlerFunc(handleLEAdvertisingReport))
 
-	fmt.Printf("\nStart scanning for another second with customized advertising report handler ...\n")
-	time.Sleep(3 * time.Second)
+	fmt.Printf("\nStart scanning for another 5 seconds with customized advertising report handler ...\n")
+	time.Sleep(5 * time.Second)
 
-	h.Send(&cmd.LESetScanEnable{
-		LEScanEnable: 0,
-	}, nil)
+	h.Send(&cmd.LESetScanEnable{LEScanEnable: 0}, nil)
 	fmt.Printf("Stopped\n")
 
 	// h.Close()
