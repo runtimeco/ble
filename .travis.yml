@@ -1,0 +1,16 @@
+language: go
+
+go:
+        - 1.4
+        - 1.5
+        - 1.6
+        - 1.7
+        - tip
+
+go_import_path: github.com/currantlabs/ble
+
+test:
+        - go vet ./...
+        - go test -v ./...
+        - GOOS=linux go build -v ./...
+        - GOOS=darwin go build -v ./...
