@@ -207,8 +207,5 @@ func (h *HCI) SetAdvertisement(ad []byte, sr []byte) error {
 
 	h.params.scanResp.ScanResponseDataLength = uint8(len(sr))
 	copy(h.params.scanResp.ScanResponseData[:], sr)
-	if err := h.Send(&h.params.scanResp, nil); err != nil {
-		return err
-	}
-	return nil
+	return h.Send(&h.params.scanResp, nil)
 }

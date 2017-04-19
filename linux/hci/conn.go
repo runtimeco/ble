@@ -141,7 +141,7 @@ func (c *Conn) Read(sdu []byte) (n int, err error) {
 	buf.Write(data)
 	for buf.Len() < slen {
 		p := <-c.chInPDU
-		buf.Write(pdu(p).payload())
+		buf.Write(p.payload())
 	}
 	return slen, nil
 }
@@ -206,10 +206,10 @@ func (c *Conn) writePDU(pdu []byte) (int, error) {
 		}
 
 		// Prepare the Headers
-		binary.Write(pkt, binary.LittleEndian, uint8(pktTypeACLData))                         // HCI Header: pkt Type
-		binary.Write(pkt, binary.LittleEndian, uint16(c.param.ConnectionHandle()|(flags<<8))) // ACL Header: handle and flags
-		binary.Write(pkt, binary.LittleEndian, uint16(flen))                                  // ACL Header: data len
-		binary.Write(pkt, binary.LittleEndian, pdu[:flen])                                    // Append payload
+		binary.Write(pkt, binary.LittleEndian, pktTypeACLData)                        // HCI Header: pkt Type
+		binary.Write(pkt, binary.LittleEndian, c.param.ConnectionHandle()|(flags<<8)) // ACL Header: handle and flags
+		binary.Write(pkt, binary.LittleEndian, uint16(flen))                          // ACL Header: data len
+		binary.Write(pkt, binary.LittleEndian, pdu[:flen])                            // Append payload
 
 		// Flush the pkt to HCI
 		select {

@@ -237,7 +237,7 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	}
 	p := &pkt{c, make(chan []byte)}
 	b := <-h.chCmdBufs
-	b[0] = byte(pktTypeCommand) // HCI header
+	b[0] = pktTypeCommand // HCI header
 	b[1] = byte(c.OpCode())
 	b[2] = byte(c.OpCode() >> 8)
 	b[3] = byte(c.Len())

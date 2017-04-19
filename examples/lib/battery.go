@@ -1,6 +1,10 @@
 package lib
 
-import "github.com/currantlabs/ble"
+import (
+	"fmt"
+
+	"github.com/currantlabs/ble"
+)
 
 // NewBatteryService ...
 func NewBatteryService() *ble.Service {
@@ -9,7 +13,10 @@ func NewBatteryService() *ble.Service {
 	c := s.NewCharacteristic(ble.UUID16(0x2A19))
 	c.HandleRead(
 		ble.ReadHandlerFunc(func(req ble.Request, rsp ble.ResponseWriter) {
-			rsp.Write([]byte{lv})
+			_, err := rsp.Write([]byte{lv})
+			if err != nil {
+				fmt.Printf("failed to write data: %v", err)
+			}
 			lv--
 		}))
 

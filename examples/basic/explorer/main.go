@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 
 	"github.com/currantlabs/ble"
@@ -69,11 +68,17 @@ func main() {
 	}
 
 	// Start the exploration.
-	explore(cln, p)
+	err = explore(cln, p)
+	if err != nil {
+		fmt.Printf("failed to explore: %v", err.Error())
+	}
 
 	// Disconnect the connection. (On OS X, this might take a while.)
 	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Address())
-	cln.CancelConnection()
+	err = cln.CancelConnection()
+	if err != nil {
+		fmt.Printf("failed to cancel connection: %v", err.Error())
+	}
 
 	<-done
 }
@@ -167,16 +172,4 @@ func propString(p ble.Property) string {
 		}
 	}
 	return s
-}
-
-func chkErr(err error) {
-	switch errors.Cause(err) {
-	case nil:
-	case context.DeadlineExceeded:
-		fmt.Printf("done\n")
-	case context.Canceled:
-		fmt.Printf("canceled\n")
-	default:
-		log.Fatalf(err.Error())
-	}
 }

@@ -30,7 +30,6 @@ var curr struct {
 
 var (
 	errNotConnected = fmt.Errorf("not connected")
-	errNoProfile    = fmt.Errorf("no profile")
 	errNoUUID       = fmt.Errorf("no UUID")
 	errInvalidUUID  = fmt.Errorf("invalid UUID")
 )

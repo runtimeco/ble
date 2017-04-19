@@ -21,7 +21,7 @@ var (
 func main() {
 	flag.Parse()
 
-	d, err := dev.NewDevice("default")
+	d, err := dev.NewDevice(*device)
 	if err != nil {
 		log.Fatalf("can't new device : %s", err)
 	}

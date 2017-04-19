@@ -71,12 +71,9 @@ func defaultServices(name string) []*ble.Service {
 	gattSvc.NewCharacteristic(ble.ServiceChangedUUID).HandleIndicate(
 		ble.NotifyHandlerFunc(func(r ble.Request, n ble.Notifier) {
 			log.Printf("TODO: indicate client when the services are changed")
-			for {
-				select {
-				case <-n.Context().Done():
-					log.Printf("count: Notification unsubscribed")
-					return
-				}
+			for range n.Context().Done() {
+				log.Printf("count: Notification unsubscribed")
+				return
 			}
 		}))
 	return []*ble.Service{gapSvc, gattSvc}
