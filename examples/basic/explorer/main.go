@@ -99,15 +99,7 @@ func explore(cln ble.Client, p *ble.Profile) error {
 				fmt.Printf("        Value         %x | %q\n", b, b)
 			}
 
-			for _, d := range c.Descriptors {
-				fmt.Printf("        Descriptor: %s %s, Handle(0x%02x)\n", d.UUID, ble.Name(d.UUID), d.Handle)
-				b, err := cln.ReadDescriptor(d)
-				if err != nil {
-					fmt.Printf("Failed to read descriptor: %s\n", err)
-					continue
-				}
-				fmt.Printf("        Value         %x | %q\n", b, b)
-			}
+			exploreDescriptors(c.Descriptors, cln)
 
 			if *sub != 0 {
 				// Don't bother to subscribe the Service Changed characteristics.
@@ -125,34 +117,54 @@ func explore(cln ble.Client, p *ble.Profile) error {
 				}
 
 				if (c.Property & ble.CharNotify) != 0 {
-					fmt.Printf("\n-- Subscribe to notification for %s --\n", *sub)
-					h := func(req []byte) { fmt.Printf("Notified: %q [ % X ]\n", string(req), req) }
-					if err := cln.Subscribe(c, false, h); err != nil {
-						log.Fatalf("subscribe failed: %s", err)
-					}
-					time.Sleep(*sub)
-					if err := cln.Unsubscribe(c, false); err != nil {
-						log.Fatalf("unsubscribe failed: %s", err)
-					}
-					fmt.Printf("-- Unsubscribe to notification --\n")
+					subscribeToNotification(cln, c, *sub)
 				}
 				if (c.Property & ble.CharIndicate) != 0 {
-					fmt.Printf("\n-- Subscribe to indication of %s --\n", *sub)
-					h := func(req []byte) { fmt.Printf("Indicated: %q [ % X ]\n", string(req), req) }
-					if err := cln.Subscribe(c, true, h); err != nil {
-						log.Fatalf("subscribe failed: %s", err)
-					}
-					time.Sleep(*sub)
-					if err := cln.Unsubscribe(c, true); err != nil {
-						log.Fatalf("unsubscribe failed: %s", err)
-					}
-					fmt.Printf("-- Unsubscribe to indication --\n")
+					subscribeToIndication(cln, c, *sub)
 				}
 			}
 		}
 		fmt.Printf("\n")
 	}
 	return nil
+}
+
+func subscribeToNotification(cln ble.Client, c *ble.Characteristic, sub time.Duration) {
+	fmt.Printf("\n-- Subscribe to notification for %s --\n", sub)
+	h := func(req []byte) { fmt.Printf("Notified: %q [ % X ]\n", string(req), req) }
+	if err := cln.Subscribe(c, false, h); err != nil {
+		log.Fatalf("subscribe failed: %s", err)
+	}
+	time.Sleep(sub)
+	if err := cln.Unsubscribe(c, false); err != nil {
+		log.Fatalf("unsubscribe failed: %s", err)
+	}
+	fmt.Printf("-- Unsubscribe to notification --\n")
+}
+
+func subscribeToIndication(cln ble.Client, c *ble.Characteristic, sub time.Duration) {
+	fmt.Printf("\n-- Subscribe to indication of %s --\n", sub)
+	h := func(req []byte) { fmt.Printf("Indicated: %q [ % X ]\n", string(req), req) }
+	if err := cln.Subscribe(c, true, h); err != nil {
+		log.Fatalf("subscribe failed: %s", err)
+	}
+	time.Sleep(sub)
+	if err := cln.Unsubscribe(c, true); err != nil {
+		log.Fatalf("unsubscribe failed: %s", err)
+	}
+	fmt.Printf("-- Unsubscribe to indication --\n")
+}
+
+func exploreDescriptors(descriptors []*ble.Descriptor, cln ble.Client) {
+	for _, d := range descriptors {
+		fmt.Printf("        Descriptor: %s %s, Handle(0x%02x)\n", d.UUID, ble.Name(d.UUID), d.Handle)
+		b, err := cln.ReadDescriptor(d)
+		if err != nil {
+			fmt.Printf("Failed to read descriptor: %s\n", err)
+			continue
+		}
+		fmt.Printf("        Value         %x | %q\n", b, b)
+	}
 }
 
 func propString(p ble.Property) string {
