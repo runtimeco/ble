@@ -117,7 +117,9 @@ func (c *conn) subscribed(char *ble.Characteristic) {
 // server (peripheral)
 func (c *conn) unsubscribed(char *ble.Characteristic) {
 	if n, found := c.notifiers[char.Handle]; found {
-		n.Close()
+		if err := n.Close(); err != nil {
+			logger.Debug("failed to close notifier: %v", err)
+		}
 		delete(c.notifiers, char.Handle)
 	}
 }

@@ -159,14 +159,16 @@ func (d *Device) AdvertiseNameAndServices(ctx context.Context, name string, ss .
 		return err
 	}
 	<-ctx.Done()
-	d.stopAdvertising()
+	_ = d.stopAdvertising()
 	return ctx.Err()
 }
 
 // AdvertiseIBeaconData advertises iBeacon packet with specified manufacturer data.
 func (d *Device) AdvertiseIBeaconData(ctx context.Context, md []byte) error {
 	var utsname xpc.Utsname
-	xpc.Uname(&utsname)
+	if err := xpc.Uname(&utsname); err != nil {
+		return err
+	}
 
 	if utsname.Release >= "14." {
 		ibeaconCode := []byte{0x02, 0x15}
