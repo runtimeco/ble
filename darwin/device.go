@@ -197,14 +197,12 @@ func (d *Device) stopAdvertising() error {
 // Scan ...
 func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) error {
 	d.advHandler = h
-	if err := d.sendCmd(d.cm, 29, xpc.Dict{
+	d.sendCmd(d.cm, 29, xpc.Dict{
 		// "kCBMsgArgUUIDs": uuidSlice(ss),
 		"kCBMsgArgOptions": xpc.Dict{
 			"kCBScanOptionAllowDuplicates": map[bool]int{true: 1, false: 0}[allowDup],
 		},
-	}); err != nil {
-		return err
-	}
+	})
 	<-ctx.Done()
 	if err := d.stopScanning(); err != nil {
 		return errors.Wrap(ctx.Err(), err.Error())
@@ -214,12 +212,14 @@ func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) erro
 
 // stopAdvertising stops advertising.
 func (d *Device) stopScanning() error {
-	return errors.Wrap(d.sendCmd(d.cm, 30, nil), "can't stop scanning")
+	d.sendCmd(d.cm, 30, nil)
+	return nil
 }
 
 // RemoveAllServices removes all services of device's
 func (d *Device) RemoveAllServices() error {
-	return d.sendCmd(d.pm, 12, nil)
+	d.sendCmd(d.pm, 12, nil)
+	return nil
 }
 
 // AddService adds a service to device's database.
@@ -515,8 +515,7 @@ func (d *Device) sendReq(x xpc.XPC, id int, args xpc.Dict) msg {
 	return <-d.rspc
 }
 
-func (d *Device) sendCmd(x xpc.XPC, id int, args xpc.Dict) error {
+func (d *Device) sendCmd(x xpc.XPC, id int, args xpc.Dict) {
 	logger.Info("send", "id", id, "args", fmt.Sprintf("%v", args))
 	x.Send(xpc.Dict{"kCBMsgId": id, "kCBMsgArgs": args}, false)
-	return nil
 }

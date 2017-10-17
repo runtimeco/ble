@@ -27,7 +27,6 @@ type conn struct {
 	sync.RWMutex
 
 	dev   *Device
-	role  int
 	ctx   context.Context
 	rxMTU int
 	txMTU int
