@@ -25,7 +25,7 @@ func (r *DB) idx(h int) int {
 	if h < int(r.base) {
 		return tooSmall
 	}
-	if int(h) >= int(r.base)+len(r.attrs) {
+	if h >= int(r.base)+len(r.attrs) {
 		return tooLarge
 	}
 	return h - int(r.base)
@@ -166,7 +166,9 @@ func newCCCD(c *ble.Characteristic) *ble.Descriptor {
 	d.HandleRead(ble.ReadHandlerFunc(func(req ble.Request, rsp ble.ResponseWriter) {
 		cccs := req.Conn().(*conn).cccs
 		ccc := cccs[c.Handle]
-		binary.Write(rsp, binary.LittleEndian, ccc)
+		if err := binary.Write(rsp, binary.LittleEndian, ccc); err != nil {
+			logger.Debug("db", "newCCCD", fmt.Sprintf("failed to write: %v", err))
+		}
 	}))
 
 	d.HandleWrite(ble.WriteHandlerFunc(func(req ble.Request, rsp ble.ResponseWriter) {
@@ -189,7 +191,9 @@ func newCCCD(c *ble.Characteristic) *ble.Descriptor {
 			go c.NotifyHandler.ServeNotify(req, cn.nn[c.Handle])
 		}
 		if !newNotify && oldNotify {
-			cn.nn[c.Handle].Close()
+			if err := cn.nn[c.Handle].Close(); err != nil {
+				logger.Debug("db", "newCCCD", fmt.Sprintf("failed to close: %v", err))
+			}
 		}
 
 		if newIndicate && !oldIndicate {
@@ -202,7 +206,9 @@ func newCCCD(c *ble.Characteristic) *ble.Descriptor {
 			go c.IndicateHandler.ServeNotify(req, cn.in[c.Handle])
 		}
 		if !newIndicate && oldIndicate {
-			cn.in[c.Handle].Close()
+			if err := cn.in[c.Handle].Close(); err != nil {
+				logger.Debug("db", "newCCCD", fmt.Sprintf("failed to close: %v", err))
+			}
 		}
 		cn.cccs[c.Handle] = ccc
 	}))

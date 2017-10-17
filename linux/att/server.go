@@ -173,7 +173,7 @@ func (s *Server) Loop() {
 		}
 		if ccc&cccNotify != 0 {
 			if err := s.conn.nn[h].Close(); err != nil {
-				logger.Debug("server", "loop", fmt.Sprint("failed close: %v", err))
+				logger.Debug("server", "loop", fmt.Sprintf("failed close: %v", err))
 			}
 		}
 	}
@@ -281,10 +281,10 @@ func (s *Server) handleFindInformationRequest(r FindInformationRequest) []byte {
 			break
 		}
 		if err := binary.Write(buf, binary.LittleEndian, a.h); err != nil {
-			logger.Debug("server", "findInformationRequest", fmt.Sprint("failed to write: %v", err))
+			logger.Debug("server", "findInformationRequest", fmt.Sprintf("failed to write: %v", err))
 		}
 		if err := binary.Write(buf, binary.LittleEndian, a.typ); err != nil {
-			logger.Debug("server", "findInformationRequest", fmt.Sprint("failed to write: %v", err))
+			logger.Debug("server", "findInformationRequest", fmt.Sprintf("failed to write: %v", err))
 		}
 	}
 
@@ -312,7 +312,7 @@ func (s *Server) handleFindByTypeValueRequest(r FindByTypeValueRequest) []byte {
 
 	for _, a := range s.db.subrange(r.StartingHandle(), r.EndingHandle()) {
 		v, starth, endh := a.v, a.h, a.endh
-		if !(ble.UUID(a.typ).Equal(ble.UUID16(r.AttributeType()))) {
+		if !(a.typ.Equal(ble.UUID16(r.AttributeType()))) {
 			continue
 		}
 		if v == nil {
@@ -466,7 +466,9 @@ func (s *Server) handleReadBlobRequest(r ReadBlobRequest) []byte {
 
 	// Simple case. Read-only, no-authorization, no-authentication.
 	if a.v != nil {
-		binary.Write(buf, binary.LittleEndian, a.v)
+		if err := binary.Write(buf, binary.LittleEndian, a.v); err != nil {
+			logger.Debug("server", "handleReadBlobRequest", fmt.Sprintf("failed to write: %v", err))
+		}
 		return rsp[:1+buf.Len()]
 	}
 
@@ -519,9 +521,15 @@ func (s *Server) handleReadByGroupRequest(r ReadByGroupTypeRequest) []byte {
 		if buf.Len()+dlen > buf.Cap() {
 			break
 		}
-		binary.Write(buf, binary.LittleEndian, a.h)
-		binary.Write(buf, binary.LittleEndian, a.endh)
-		binary.Write(buf, binary.LittleEndian, v[:dlen-4])
+		if err := binary.Write(buf, binary.LittleEndian, a.h); err != nil {
+			logger.Debug("server", "handleReadByGroupRequest", fmt.Sprintf("failed to write: %v", err))
+		}
+		if err := binary.Write(buf, binary.LittleEndian, a.endh); err != nil {
+			logger.Debug("server", "handleReadByGroupRequest", fmt.Sprintf("failed to write: %v", err))
+		}
+		if err := binary.Write(buf, binary.LittleEndian, v[:dlen-4]); err != nil {
+			logger.Debug("server", "handleReadByGroupRequest", fmt.Sprintf("failed to write: %v", err))
+		}
 	}
 	if dlen == 0 {
 		return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ble.ErrAttrNotFound)

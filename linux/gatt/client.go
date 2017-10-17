@@ -66,17 +66,17 @@ func (p *Client) DiscoverProfile(force bool) (*ble.Profile, error) {
 	}
 	ss, err := p.DiscoverServices(nil)
 	if err != nil {
-		return nil, fmt.Errorf("can't discover services: %s\n", err)
+		return nil, fmt.Errorf("can't discover services: %s", err)
 	}
 	for _, s := range ss {
 		cs, err := p.DiscoverCharacteristics(nil, s)
 		if err != nil {
-			return nil, fmt.Errorf("can't discover characteristics: %s\n", err)
+			return nil, fmt.Errorf("can't discover characteristics: %s", err)
 		}
 		for _, c := range cs {
 			_, err := p.DiscoverDescriptors(nil, c)
 			if err != nil {
-				return nil, fmt.Errorf("can't discover descriptors: %s\n", err)
+				return nil, fmt.Errorf("can't discover descriptors: %s", err)
 			}
 		}
 	}
@@ -314,7 +314,7 @@ func (p *Client) setHandlers(cccdh, vh, flag uint16, h ble.NotificationHandler) 
 	case h != nil && (s.ccc&flag) != 0:
 		return nil
 	case h == nil && (s.ccc&flag) != 0:
-		s.ccc &= ^uint16(flag)
+		s.ccc &= ^flag
 	case h != nil && (s.ccc&flag) == 0:
 		s.ccc |= flag
 	}

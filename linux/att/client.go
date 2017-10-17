@@ -554,7 +554,9 @@ func (c *Client) Loop() {
 		// Always write aknowledgement for an indication, even it was an invalid request.
 		if b[0] == HandleValueIndicationCode {
 			logger.Debug("client", "req", fmt.Sprintf("% X", b))
-			c.l2c.Write(confirmation)
+			if _, err := c.l2c.Write(confirmation); err != nil {
+				logger.Debug("client", "loop", fmt.Sprintf("failed to write: %v", err))
+			}
 		}
 	}
 }
