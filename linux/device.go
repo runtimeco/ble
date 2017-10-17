@@ -99,7 +99,7 @@ func (d *Device) AdvertiseNameAndServices(ctx context.Context, name string, uuid
 		return err
 	}
 	<-ctx.Done()
-	d.HCI.StopAdvertising()
+	_ = d.HCI.StopAdvertising()
 	return ctx.Err()
 }
 
@@ -109,7 +109,7 @@ func (d *Device) AdvertiseMfgData(ctx context.Context, id uint16, b []byte) erro
 		return err
 	}
 	<-ctx.Done()
-	d.HCI.StopAdvertising()
+	_ = d.HCI.StopAdvertising()
 	return ctx.Err()
 }
 
@@ -119,7 +119,7 @@ func (d *Device) AdvertiseServiceData16(ctx context.Context, id uint16, b []byte
 		return err
 	}
 	<-ctx.Done()
-	d.HCI.StopAdvertising()
+	_ = d.HCI.StopAdvertising()
 	return ctx.Err()
 }
 
@@ -129,7 +129,7 @@ func (d *Device) AdvertiseIBeaconData(ctx context.Context, b []byte) error {
 		return err
 	}
 	<-ctx.Done()
-	d.HCI.StopAdvertising()
+	_ = d.HCI.StopAdvertising()
 	return ctx.Err()
 }
 
@@ -139,7 +139,7 @@ func (d *Device) AdvertiseIBeacon(ctx context.Context, u ble.UUID, major, minor 
 		return err
 	}
 	<-ctx.Done()
-	d.HCI.StopAdvertising()
+	_ = d.HCI.StopAdvertising()
 	return ctx.Err()
 }
 
@@ -152,7 +152,7 @@ func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) erro
 		return err
 	}
 	<-ctx.Done()
-	d.HCI.StopScanning()
+	_ = d.HCI.StopScanning()
 	return ctx.Err()
 }
 

@@ -143,7 +143,7 @@ func (s *Server) Loop() {
 				select {
 				case s.chConfirm <- true:
 				default:
-					logger.Error("server", "recieved a spurious confirmation", nil)
+					_ = logger.Error("server", "recieved a spurious confirmation", nil)
 				}
 				continue
 			}
@@ -155,7 +155,9 @@ func (s *Server) Loop() {
 	for req := range seq {
 		if rsp := s.handleRequest(req.buf[:req.len]); rsp != nil {
 			if len(rsp) != 0 {
-				s.conn.Write(rsp)
+				if _, err := s.conn.Write(rsp); err != nil {
+					logger.Debug("server", "loop", fmt.Sprintf("failed write: %v", err))
+				}
 			}
 		}
 		pool <- req
@@ -165,10 +167,14 @@ func (s *Server) Loop() {
 			logger.Info("cleanup", "ccc", fmt.Sprintf("0x%02X", ccc))
 		}
 		if ccc&cccIndicate != 0 {
-			s.conn.in[h].Close()
+			if err := s.conn.in[h].Close(); err != nil {
+				logger.Debug("server", "loop", fmt.Sprintf("failed close: %v", err))
+			}
 		}
 		if ccc&cccNotify != 0 {
-			s.conn.nn[h].Close()
+			if err := s.conn.nn[h].Close(); err != nil {
+				logger.Debug("server", "loop", fmt.Sprint("failed close: %v", err))
+			}
 		}
 	}
 }
@@ -274,8 +280,12 @@ func (s *Server) handleFindInformationRequest(r FindInformationRequest) []byte {
 		if buf.Len()+2+a.typ.Len() > buf.Cap() {
 			break
 		}
-		binary.Write(buf, binary.LittleEndian, a.h)
-		binary.Write(buf, binary.LittleEndian, a.typ)
+		if err := binary.Write(buf, binary.LittleEndian, a.h); err != nil {
+			logger.Debug("server", "findInformationRequest", fmt.Sprint("failed to write: %v", err))
+		}
+		if err := binary.Write(buf, binary.LittleEndian, a.typ); err != nil {
+			logger.Debug("server", "findInformationRequest", fmt.Sprint("failed to write: %v", err))
+		}
 	}
 
 	// Nothing has been found.
@@ -323,8 +333,12 @@ func (s *Server) handleFindByTypeValueRequest(r FindByTypeValueRequest) []byte {
 		if buf.Len()+4 > buf.Cap() {
 			break
 		}
-		binary.Write(buf, binary.LittleEndian, starth)
-		binary.Write(buf, binary.LittleEndian, endh)
+		if err := binary.Write(buf, binary.LittleEndian, starth); err != nil {
+			logger.Debug("server", "findByTypeValueRequest", fmt.Sprintf("failed to write: %v", err))
+		}
+		if err := binary.Write(buf, binary.LittleEndian, endh); err != nil {
+			logger.Debug("server", "findByTypeValueRequest", fmt.Sprintf("failed to write: %v", err))
+		}
 	}
 	if buf.Len() == 0 {
 		return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ble.ErrAttrNotFound)
@@ -385,8 +399,12 @@ func (s *Server) handleReadByTypeRequest(r ReadByTypeRequest) []byte {
 		if buf.Len()+dlen > buf.Cap() {
 			break
 		}
-		binary.Write(buf, binary.LittleEndian, a.h)
-		binary.Write(buf, binary.LittleEndian, v[:dlen-2])
+		if err := binary.Write(buf, binary.LittleEndian, a.h); err != nil {
+			logger.Debug("server", "handleReadByTypeRequest", fmt.Sprintf("failed to write: %v", err))
+		}
+		if err := binary.Write(buf, binary.LittleEndian, v[:dlen-2]); err != nil {
+			logger.Debug("server", "handleReadByTypeRequest", fmt.Sprintf("failed to write: %v", err))
+		}
 	}
 	if dlen == 0 {
 		return newErrorResponse(r.AttributeOpcode(), r.StartingHandle(), ble.ErrAttrNotFound)
@@ -414,7 +432,9 @@ func (s *Server) handleReadRequest(r ReadRequest) []byte {
 
 	// Simple case. Read-only, no-authorization, no-authentication.
 	if a.v != nil {
-		binary.Write(buf, binary.LittleEndian, a.v)
+		if err := binary.Write(buf, binary.LittleEndian, a.v); err != nil {
+			logger.Debug("server", "handleReadRequest", fmt.Sprintf("failed to write: %v", err))
+		}
 		return rsp[:1+buf.Len()]
 	}
 
