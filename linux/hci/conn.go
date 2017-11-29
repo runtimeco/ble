@@ -8,9 +8,9 @@ import (
 	"io"
 	"net"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/hci/cmd"
-	"github.com/go-ble/ble/linux/hci/evt"
+	"github.com/runtimeco/ble"
+	"github.com/runtimeco/ble/linux/hci/cmd"
+	"github.com/runtimeco/ble/linux/hci/evt"
 	"github.com/pkg/errors"
 )
 
