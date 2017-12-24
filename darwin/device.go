@@ -507,7 +507,8 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 	case evtCharacteristicRead:
 		// Notification
 		c := d.conn(args)
-		if args.isNotification() != 0 {
+
+		// if args.isNotification() != 0 {
 			sub := c.subs[uint16(args.characteristicHandle())]
 			if sub == nil {
 				log.Printf("notified by unsubscribed handle")
@@ -516,7 +517,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 				sub.fn(args.data())
 			}
 			break
-		}
+		// }
 		c.rspc <- m
 
 	case // Peripheral events
