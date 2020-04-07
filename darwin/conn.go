@@ -2,26 +2,35 @@ package darwin
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 
-	"github.com/go-ble/ble"
-	"github.com/raff/goble/xpc"
+	"github.com/runtimeco/ble"
 )
 
-func newConn(d *Device, a ble.Addr, rxMTU int) *conn {
-	return &conn{
+func newConn(d *Device, a ble.Addr, txMTU int) *conn {
+	c := &conn{
 		dev:   d,
-		rxMTU: rxMTU,
-		txMTU: 23,
+		rxMTU: 23,
+		txMTU: txMTU,
 		addr:  a,
 		done:  make(chan struct{}),
 
 		notifiers: make(map[uint16]ble.Notifier),
-		subs:      make(map[uint16]*sub),
+		subs:      make(map[string]*sub),
+		chrReads:  make(map[string]chan *eventChrRead),
 
 		rspc: make(chan msg),
+		evl:  newCentralEventListener(),
 	}
+
+	go func() {
+		<-c.evl.disconnected
+		close(c.done)
+	}()
+
+	return c
 }
 
 type conn struct {
@@ -35,16 +44,12 @@ type conn struct {
 	done  chan struct{}
 
 	rspc chan msg
-
-	connInterval       int
-	connLatency        int
-	supervisionTimeout int
+	evl  *centralEventListener
 
 	notifiers map[uint16]ble.Notifier // central connection only
 
-	subs map[uint16]*sub
-
-	isConnected bool
+	subs     map[string]*sub
+	chrReads map[string](chan *eventChrRead)
 }
 
 func (c *conn) Context() context.Context {
@@ -85,12 +90,12 @@ func (c *conn) SetTxMTU(mtu int) {
 func (c *conn) Read(b []byte) (int, error) {
 	return 0, nil
 }
-
 func (c *conn) Write(b []byte) (int, error) {
 	return 0, nil
 }
 
 func (c *conn) Close() error {
+	c.evl.Close()
 	return nil
 }
 
@@ -99,45 +104,76 @@ func (c *conn) Disconnected() <-chan struct{} {
 	return c.done
 }
 
-// server (peripheral)
-func (c *conn) subscribed(char *ble.Characteristic) {
-	h := char.Handle
-	if _, found := c.notifiers[h]; found {
-		return
-	}
-	send := func(b []byte) (int, error) {
-		err := c.dev.sendCmd(c.dev.pm, cmdSubscribed, xpc.Dict{
-			"kCBMsgArgUUIDs":       [][]byte{},
-			"kCBMsgArgAttributeID": h,
-			"kCBMsgArgData":        b,
-		})
-		return len(b), err
-	}
-	n := ble.NewNotifier(send)
-	c.notifiers[h] = n
-	req := ble.NewRequest(c, nil, 0) // convey *conn to user handler.
-	go char.NotifyHandler.ServeNotify(req, n)
-}
+func (c *conn) processChrRead(ev *eventChrRead) {
+	c.RLock()
+	defer c.RUnlock()
 
-// server (peripheral)
-func (c *conn) unsubscribed(char *ble.Characteristic) {
-	if n, found := c.notifiers[char.Handle]; found {
-		if err := n.Close(); err != nil {
-			log.Printf("failed to clone notifier: %v", err)
-		}
-		delete(c.notifiers, char.Handle)
+	uuidStr := uuidStrWithDashes(ev.uuid.String())
+	found := false
+
+	ch := c.chrReads[uuidStr]
+	if ch != nil {
+		ch <- ev
+		found = true
+	}
+
+	s := c.subs[uuidStr]
+	if s != nil {
+		s.fn(ev.value)
+		found = true
+	}
+
+	if !found {
+		log.Printf("received characteristic read response without corresponding request: uuid=%s", uuidStr)
 	}
 }
 
-func (c *conn) sendReq(id int, args xpc.Dict) (msg, error) {
-	err := c.dev.sendCmd(c.dev.cm, id, args)
-	if err != nil {
-		return msg{}, err
+func (c *conn) addChrReader(char *ble.Characteristic) (chan *eventChrRead, error) {
+	uuidStr := uuidStrWithDashes(char.UUID.String())
+
+	c.Lock()
+	defer c.Unlock()
+
+	if c.chrReads[uuidStr] != nil {
+		return nil, fmt.Errorf("cannot read from the same attribute twice: uuid=%s", uuidStr)
 	}
-	m := <-c.rspc
-	return msg(m.args()), nil
+
+	ch := make(chan *eventChrRead)
+	c.chrReads[uuidStr] = ch
+
+	return ch, nil
 }
 
-func (c *conn) sendCmd(id int, args xpc.Dict) error {
-	return c.dev.sendCmd(c.dev.pm, id, args)
+func (c *conn) delChrReader(char *ble.Characteristic) {
+	uuidStr := uuidStrWithDashes(char.UUID.String())
+
+	c.Lock()
+	defer c.Unlock()
+
+	delete(c.chrReads, uuidStr)
+}
+
+func (c *conn) addSub(char *ble.Characteristic, fn ble.NotificationHandler) {
+	uuidStr := uuidStrWithDashes(char.UUID.String())
+
+	c.Lock()
+	defer c.Unlock()
+
+	// It feels like we should return an error if we are already subscribed to
+	// this characteristic.  Just quietly overwrite the existing handler to
+	// preserve backwards compatibility.
+
+	c.subs[uuidStr] = &sub{
+		fn:   fn,
+		char: char,
+	}
+}
+
+func (c *conn) delSub(char *ble.Characteristic) {
+	uuidStr := uuidStrWithDashes(char.UUID.String())
+
+	c.Lock()
+	defer c.Unlock()
+
+	delete(c.subs, uuidStr)
 }

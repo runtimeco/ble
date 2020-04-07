@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-ble/ble/linux/hci/cmd"
-	"github.com/go-ble/ble/linux/hci/evt"
+	"github.com/runtimeco/ble/linux/hci/cmd"
+	"github.com/runtimeco/ble/linux/hci/evt"
 )
 
 // SetConnectedHandler sets handler to be called when new connection is established.
@@ -20,13 +20,11 @@ func (d *Device) SetDisconnectedHandler(f func(evt.DisconnectionComplete)) error
 
 // SetPeripheralRole configures the device to perform Peripheral tasks.
 func (d *Device) SetPeripheralRole() error {
-	d.role = 1
 	return nil
 }
 
 // SetCentralRole configures the device to perform Central tasks.
 func (d *Device) SetCentralRole() error {
-	d.role = 0
 	return nil
 }
 
