@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-ble/ble"
+	"github.com/runtimeco/ble"
 
 	"sync"
 )

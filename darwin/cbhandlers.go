@@ -13,7 +13,7 @@ import (
 	"log"
 	"unsafe"
 
-	"github.com/go-ble/ble"
+	"github.com/runtimeco/ble"
 )
 
 //export BTStateChanged

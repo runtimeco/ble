@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	"github.com/go-ble/ble"
+	"github.com/runtimeco/ble"
 )
 
 var cmgrIDDevMap = map[uintptr]*Device{}

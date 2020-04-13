@@ -1,6 +1,6 @@
 package darwin
 
-import "github.com/go-ble/ble"
+import "github.com/runtimeco/ble"
 
 type discoveredSvc struct {
 	id   uintptr
