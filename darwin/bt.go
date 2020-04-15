@@ -44,7 +44,3 @@ func StartBTLoop(ch chan BTState) error {
 func StopBTLoop() {
 	C.bt_stop()
 }
-
-func BTInit() {
-	C.bt_init()
-}
